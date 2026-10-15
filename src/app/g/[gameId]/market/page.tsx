@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Handshake, Search, Tag } from "lucide-react";
+import { ArrowLeft, ArrowRight, Globe, Handshake, Search, Tag, X } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
+import { ExternalOfferForm } from "@/components/external-offer-form";
 import { PlayerAvatar } from "@/components/squad/avatar";
 import { Badge, Card, CardTitle, Empty, FormArrow, OvrBadge, PosPill, cn, eur, inputCls } from "@/components/ui";
 import { cancelOfferAction, respondOfferAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
-import { getGame, getOffers, getRecentTransfers, searchMarket } from "@/server/queries";
+import { getExternalPlayer, getGame, getMarketLeagues, getOffers, getRecentTransfers, searchMarket } from "@/server/queries";
 
 export const metadata = { title: "Mercado" };
 
-type SP = { pos?: string; min?: string; max?: string; price?: string; q?: string; listed?: string; page?: string };
+type SP = { pos?: string; min?: string; max?: string; price?: string; q?: string; listed?: string; page?: string; league?: string; scout?: string };
+const UUID = /^[0-9a-f-]{36}$/;
 const STATUS: Record<string, string> = { pending: "Pendente", accepted: "Aceite", rejected: "Recusada", cancelled: "Cancelada", expired: "Expirada", superseded: "Ultrapassada" };
 
 export default async function Market({ params, searchParams }: { params: Promise<{ gameId: string }>; searchParams: Promise<SP> }) {
@@ -21,13 +23,49 @@ export default async function Market({ params, searchParams }: { params: Promise
     position: ["GK", "DEF", "MID", "ATT"].includes(sp.pos ?? "") ? sp.pos : undefined,
     minOvr: Number(sp.min) || 1, maxOvr: Number(sp.max) || 99, maxPrice: Number(sp.price) || undefined,
     q: sp.q?.slice(0, 40), listedOnly: sp.listed === "1", page: Math.max(1, Number(sp.page) || 1),
+    league: sp.league === "game" || UUID.test(sp.league ?? "") ? sp.league : "",
   };
-  const [market, offers, transfers] = await Promise.all([searchMarket(user.id, gameId, filters), getOffers(user.id, gameId), getRecentTransfers(user.id, gameId)]);
+  const [market, offers, transfers, leagues, scout] = await Promise.all([
+    searchMarket(user.id, gameId, filters), getOffers(user.id, gameId), getRecentTransfers(user.id, gameId), getMarketLeagues(user.id, gameId),
+    UUID.test(sp.scout ?? "") ? getExternalPlayer(user.id, gameId, sp.scout!) : null,
+  ]);
+  const href = (p: (typeof market.rows)[number]) => (p.kind === "ext" ? qs({ scout: p.id }) + "#scout" : `/g/${gameId}/players/${p.id}`);
   const qs = (patch: Partial<SP>) => "?" + new URLSearchParams(Object.entries({ ...sp, ...patch }).filter(([, v]) => v) as [string, string][]).toString();
   const POS: [string, string][] = [["", "Todos"], ["GK", "GR"], ["DEF", "DEF"], ["MID", "MED"], ["ATT", "AV"]];
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-4">
+        {scout && (
+          <Card id="scout" glow className="scroll-mt-24">
+            <div className="flex items-start gap-4">
+              <OvrBadge ovr={scout.ovr} size="lg" />
+              <div className="min-w-0 flex-1">
+                <p className="eyebrow">Mercado externo · {scout.league_name ?? "outra liga"}</p>
+                <h2 className="headline mt-1 truncate text-3xl">{scout.name}</h2>
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <PosPill group={scout.position_group} />{scout.position_detail && <span>{scout.position_detail}</span>}
+                  <span>{scout.club_name}</span><span className="text-faint">Pot. <b className="text-muted">{scout.potential_band}</b></span>
+                  {scout.age ? <span className="text-faint">{scout.age} anos</span> : null}
+                </p>
+              </div>
+              <Link href={qs({ scout: undefined })} aria-label="Fechar" className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-ink"><X className="size-4" /></Link>
+            </div>
+            {scout.signed_player_id ? (
+              <p className="mt-4 text-sm text-muted">Já foi contratado nesta liga. <Link href={`/g/${gameId}/players/${scout.signed_player_id}`} className="font-semibold text-accent">Ver jogador →</Link></p>
+            ) : scout.in_league ? (
+              <p className="mt-4 text-sm text-muted">Joga nesta liga — faz a proposta a partir da ficha do jogador.</p>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_minmax(0,320px)] sm:items-end">
+                <dl className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-xl border border-line bg-bg/50 p-3"><dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">Valor de mercado</dt><dd className="font-display text-2xl font-extrabold tabular">{eur(scout.value_cents)}</dd></div>
+                  <div className="rounded-xl border border-line bg-bg/50 p-3"><dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">Pedem</dt><dd className="font-display text-2xl font-extrabold text-accent tabular">{eur(scout.ask_cents)}</dd></div>
+                </dl>
+                {game.my_club_id ? <ExternalOfferForm gameId={gameId} sourcePlayerId={scout.id} askEur={Math.round(Number(scout.ask_cents) / 100)} />
+                  : <p className="text-sm text-muted">Escolhe um clube para poderes contratar.</p>}
+              </div>
+            )}
+          </Card>
+        )}
         <Card className="p-3 sm:p-4">
           <form className="space-y-3" method="get">
             <div className="flex flex-wrap gap-2">
@@ -48,6 +86,14 @@ export default async function Market({ params, searchParams }: { params: Promise
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-28"><input name="min" type="number" min={1} max={99} defaultValue={sp.min} placeholder="OVR mín." aria-label="OVR mínimo" className={inputCls} /></span>
               <span className="w-36"><input name="price" type="number" min={0} defaultValue={sp.price} placeholder="Preço máx. €" aria-label="Preço máximo" className={inputCls} /></span>
+              <label className="relative min-w-[180px] flex-1 sm:flex-none">
+                <span className="sr-only">Liga</span>
+                <Globe className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
+                <select name="league" defaultValue={filters.league} className={cn(inputCls, "pl-10")}>
+                  <option value="">Todas as ligas</option>
+                  {leagues.map((l) => <option key={l.id} value={l.own ? "game" : l.id}>{l.name}{l.own ? " (esta liga)" : ""}</option>)}
+                </select>
+              </label>
               <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line bg-bg/70 px-3 text-sm font-semibold text-muted has-[:checked]:border-info/40 has-[:checked]:text-info">
                 <input type="checkbox" name="listed" value="1" defaultChecked={sp.listed === "1"} /> <Tag className="size-3.5" />À venda
               </label>
@@ -62,14 +108,15 @@ export default async function Market({ params, searchParams }: { params: Promise
           {market.rows.length === 0 ? <div className="p-4"><Empty title="Nenhum jogador encontrado" icon={<Search />}>Experimenta alargar os filtros.</Empty></div> : (
             <ul className="divide-y divide-line/70">
               {market.rows.map((p) => (
-                <li key={p.id} className="group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-surface-2/50 sm:px-4">
+                <li key={`${p.kind}-${p.id}`} className={cn("group flex items-center gap-3 px-3 py-3 transition-colors hover:bg-surface-2/50 sm:px-4", p.kind === "ext" && p.id === sp.scout && "bg-accent/[.07]")}>
                   <OvrBadge ovr={p.current_ovr} />
                   <PlayerAvatar id={p.id} primary="#2a313b" secondary="#5d6772" size={36} className="hidden sm:block" />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/g/${gameId}/players/${p.id}`} className="block truncate font-bold hover:text-accent">{p.name_snapshot}</Link>
+                    <Link href={href(p)} className="block truncate font-bold hover:text-accent">{p.name_snapshot}</Link>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                       <PosPill group={p.position_group} />
                       <span className="truncate">{p.club_name ?? "Livre"}{p.manager_user_id ? "" : " (IA)"}</span>
+                      {p.kind === "ext" && p.league_name && <span className="truncate text-faint">· {p.league_name}</span>}
                       <span className="text-faint">Pot. <b className="text-muted">{p.potential_band}</b></span>
                       {p.age ? <span className="text-faint">{p.age}a</span> : null}
                       <FormArrow form={Number(p.form)} />
@@ -80,12 +127,12 @@ export default async function Market({ params, searchParams }: { params: Promise
                     {p.listed_price ? <Badge tone="info" className="mt-1">À venda</Badge> : <span className="text-[10px] font-semibold uppercase tracking-wider text-faint">valor</span>}
                   </div>
                   {game.my_club_id && (
-                    <Link href={`/g/${gameId}/players/${p.id}`} className="hidden items-center gap-1.5 rounded-xl border border-line-strong px-3 py-2 text-xs font-bold transition hover:border-accent hover:bg-accent hover:text-accent-ink sm:inline-flex">
+                    <Link href={href(p)} className="hidden items-center gap-1.5 rounded-xl border border-line-strong px-3 py-2 text-xs font-bold transition hover:border-accent hover:bg-accent hover:text-accent-ink sm:inline-flex">
                       <Handshake className="size-3.5" />Proposta
                     </Link>
                   )}
                   {game.my_club_id && (
-                    <Link href={`/g/${gameId}/players/${p.id}`} aria-label={`Proposta por ${p.name_snapshot}`} className="flex size-9 items-center justify-center rounded-xl border border-line-strong text-muted sm:hidden">
+                    <Link href={href(p)} aria-label={`Proposta por ${p.name_snapshot}`} className="flex size-9 items-center justify-center rounded-xl border border-line-strong text-muted sm:hidden">
                       <ArrowRight className="size-4" />
                     </Link>
                   )}

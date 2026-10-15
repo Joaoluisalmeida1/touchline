@@ -101,7 +101,7 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   expect(playedCells).toBeGreaterThan(3);
 
   // Rui buys a player from an AI club at the asking price
-  await r.goto(`${gameUrl}/market?listed=`);
+  await r.goto(`${gameUrl}/market?listed=&league=game`);
   await r.locator("a", { hasText: "Proposta" }).last().click();
   await expect(r.getByLabel("Valor da proposta (€)")).toBeVisible();
   await r.getByRole("button", { name: "Fazer proposta" }).click();

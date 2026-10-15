@@ -13,6 +13,7 @@ import { domainError } from "../pg";
 import { requireUser, signIn, signOut, signUp } from "../auth";
 import { createGame, CreateGameInput } from "../services/create-game";
 import { processNextMatchday } from "../services/matchday";
+import { signExternalPlayer } from "../services/external-market";
 import { FORMATIONS, SLOTS } from "../../engine/common/types";
 
 export interface ActionState {
@@ -250,6 +251,27 @@ export async function createOfferAction(_: ActionState, form: FormData): Promise
   if (res.reason === "ai_squad_too_small") return { error: "O clube recusou: não pode reduzir mais o plantel." };
   if (res.counter_amount_cents) return { error: `Recusada. O clube pede €${(Number(res.counter_amount_cents) / 100).toLocaleString("pt-PT")}.`, data: { counter: Number(res.counter_amount_cents) / 100 } };
   return { error: `Proposta ${res.status}.` };
+}
+
+/** Buy a player from a club outside the game's league (AI answers immediately: accept at/above asking price). */
+export async function signExternalAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const gameId = uuid.parse(form.get("gameId"));
+  const sourcePlayerId = uuid.parse(form.get("sourcePlayerId"));
+  const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(100_000, "Mínimo €100 000.").max(1_000_000_000)
+    .safeParse(String(form.get("amountEur") ?? "").replace(/[^\d]/g, ""));
+  if (!amountEur.success) return { error: amountEur.error.issues[0].message };
+  let res;
+  try {
+    res = await signExternalPlayer(getPool(), user.id, gameId, sourcePlayerId, amountEur.data * 100);
+  } catch (e) {
+    return fail(e);
+  }
+  if (res.status === "accepted") {
+    revalidatePath(`/g/${gameId}`, "layout");
+    redirect(`/g/${gameId}/players/${res.player_id}?toast=signed`);
+  }
+  return { error: `Recusada. O clube pede €${(Number(res.counter_amount_cents) / 100).toLocaleString("pt-PT")}.`, data: { counter: Number(res.counter_amount_cents) / 100 } };
 }
 
 export async function respondOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
