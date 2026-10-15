@@ -43,3 +43,5 @@ next-env.d.ts
 # local data
 data/
 !.env.example
+test-results/
+playwright-report/

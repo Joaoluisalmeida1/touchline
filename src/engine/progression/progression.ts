@@ -152,7 +152,7 @@ export function progressPlayer(
   // ---- fatigue / fitness / sharpness ----
   const minutes = played ? perf!.minutes : 0;
   const fatigue = clamp(s.fatigue * 0.6 + (minutes / 90) * 20, 0, 100);
-  const recovery = 30 - fatigue * 0.15 + (s.physical - 60) * 0.05;
+  const recovery = 20 - fatigue * 0.15 + (s.physical - 60) * 0.05;
   const base = played ? perf!.stamina_end : s.fitness;
   const fitness = Math.round(clamp(base + recovery, 0, 100));
   const sharpness = Math.round(clamp(played ? s.sharpness + Math.min(15, minutes / 6) : s.sharpness - 6, 0, 100));

@@ -18,7 +18,7 @@ export const ENGINE_CONFIG = {
   // ---- progression to final third ----
   progressionBase: -0.15,
   // ---- chance creation in final third ----
-  chanceBase: -1.48,
+  chanceBase: -1.55,
   homeAdvantageLogit: 0.2,
   transitionChanceBonus: 0.45,
   // ---- fouls & cards ----

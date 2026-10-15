@@ -1,0 +1,219 @@
+<!doctype html><meta charset="utf-8"><title>Calibration match-v1.0.0</title>
+<style>body{font:14px system-ui;background:#0a101c;color:#e7eef8;max-width:1000px;margin:auto;padding:24px}th{text-align:left;vertical-align:top;padding:8px;color:#8ea3c2;width:260px}td{padding:8px;border-bottom:1px solid #22304d}pre{margin:0;white-space:pre-wrap}</style>
+<h1>Match engine calibration — match-v1.0.0</h1><p>100000 simulated matches, 286s. Synthetic teams (fictional).</p><table><tr><th>engine_version</th><td><pre>"match-v1.0.0"</pre></td></tr><tr><th>generated_at</th><td><pre>"2026-10-15T17:02:39.527Z"</pre></td></tr><tr><th>matches</th><td><pre>100000</pre></td></tr><tr><th>seconds</th><td><pre>286</pre></td></tr><tr><th>reference_bands</th><td><pre>{
+ "goals_per_match": [
+  2.5,
+  3.1
+ ],
+ "draw_pct": [
+  20,
+  30
+ ],
+ "note": "approximate public averages, top European leagues; sanity bands only"
+}</pre></td></tr><tr><th>overall</th><td><pre>{
+ "matches": 100000,
+ "goals_per_match": 3.06,
+ "first_side_win_pct": 45.2,
+ "draw_pct": 22.7,
+ "second_side_win_pct": 32.1,
+ "zero_zero_pct": 5.3,
+ "one_nil_pct": 14.6,
+ "three_plus_pct": 58.1,
+ "five_plus_pct": 19.9
+}</pre></td></tr><tr><th>per_team</th><td><pre>{
+ "shots": 12.08,
+ "shots_on_target": 4.37,
+ "xg": 1.437,
+ "yellow": 1.87,
+ "corners": 5.59,
+ "fouls": 11.2
+}</pre></td></tr><tr><th>per_match</th><td><pre>{
+ "red_cards": 0.178,
+ "penalties": 0.322
+}</pre></td></tr><tr><th>by_strength_gap_stronger_side_first</th><td><pre>{
+ "+0": {
+  "matches": 10001,
+  "goals_per_match": 2.8,
+  "first_side_win_pct": 36.3,
+  "draw_pct": 28.4,
+  "second_side_win_pct": 35.3,
+  "zero_zero_pct": 6.2,
+  "one_nil_pct": 16.4,
+  "three_plus_pct": 53,
+  "five_plus_pct": 15.3
+ },
+ "+2": {
+  "matches": 10000,
+  "goals_per_match": 2.82,
+  "first_side_win_pct": 44.5,
+  "draw_pct": 27,
+  "second_side_win_pct": 28.6,
+  "zero_zero_pct": 5.9,
+  "one_nil_pct": 16.6,
+  "three_plus_pct": 53.4,
+  "five_plus_pct": 15.4
+ },
+ "+4": {
+  "matches": 10000,
+  "goals_per_match": 2.86,
+  "first_side_win_pct": 53.1,
+  "draw_pct": 25.6,
+  "second_side_win_pct": 21.3,
+  "zero_zero_pct": 5.8,
+  "one_nil_pct": 16.1,
+  "three_plus_pct": 54.4,
+  "five_plus_pct": 16
+ },
+ "+6": {
+  "matches": 10000,
+  "goals_per_match": 3,
+  "first_side_win_pct": 61.1,
+  "draw_pct": 22.9,
+  "second_side_win_pct": 16,
+  "zero_zero_pct": 5.4,
+  "one_nil_pct": 14.5,
+  "three_plus_pct": 57.3,
+  "five_plus_pct": 18.5
+ },
+ "+8": {
+  "matches": 10000,
+  "goals_per_match": 3.13,
+  "first_side_win_pct": 69.5,
+  "draw_pct": 19.3,
+  "second_side_win_pct": 11.2,
+  "zero_zero_pct": 4.7,
+  "one_nil_pct": 14.1,
+  "three_plus_pct": 60.3,
+  "five_plus_pct": 21
+ },
+ "+10": {
+  "matches": 9999,
+  "goals_per_match": 3.31,
+  "first_side_win_pct": 76.3,
+  "draw_pct": 16.2,
+  "second_side_win_pct": 7.4,
+  "zero_zero_pct": 4.2,
+  "one_nil_pct": 12.3,
+  "three_plus_pct": 63.7,
+  "five_plus_pct": 24.1
+ },
+ "+15": {
+  "matches": 10000,
+  "goals_per_match": 3.96,
+  "first_side_win_pct": 89,
+  "draw_pct": 8.4,
+  "second_side_win_pct": 2.6,
+  "zero_zero_pct": 1.8,
+  "one_nil_pct": 8.2,
+  "three_plus_pct": 74.6,
+  "five_plus_pct": 36.5
+ }
+}</pre></td></tr><tr><th>neutral_equal_teams</th><td><pre>{
+ "matches": 1429,
+ "goals_per_match": 2.7,
+ "first_side_win_pct": 35.9,
+ "draw_pct": 29.7,
+ "second_side_win_pct": 34.4,
+ "zero_zero_pct": 6.5,
+ "one_nil_pct": 15.7,
+ "three_plus_pct": 50.2,
+ "five_plus_pct": 12.7
+}</pre></td></tr><tr><th>tactics_vs_balanced_equal_strength</th><td><pre>{
+ "balanced": {
+  "n": 3334,
+  "ppg": 1.582,
+  "gf": 1.56,
+  "ga": 1.24,
+  "avg_stamina_end": 83.2
+ },
+ "high_press": {
+  "n": 3334,
+  "ppg": 1.559,
+  "gf": 1.68,
+  "ga": 1.41,
+  "avg_stamina_end": 77.8
+ },
+ "low_block": {
+  "n": 3334,
+  "ppg": 1.534,
+  "gf": 1.26,
+  "ga": 1.01,
+  "avg_stamina_end": 86
+ },
+ "attacking": {
+  "n": 3334,
+  "ppg": 1.648,
+  "gf": 1.96,
+  "ga": 1.57,
+  "avg_stamina_end": 80.7
+ },
+ "counter": {
+  "n": 3332,
+  "ppg": 1.685,
+  "gf": 1.9,
+  "ga": 1.43,
+  "avg_stamina_end": 83.3
+ },
+ "possession": {
+  "n": 3332,
+  "ppg": 1.529,
+  "gf": 1.27,
+  "ga": 1.02,
+  "avg_stamina_end": 85.2
+ }
+}</pre></td></tr><tr><th>red_card_before_60_ppg</th><td><pre>0.985</pre></td></tr><tr><th>red_card_sample</th><td><pre>462</pre></td></tr><tr><th>tired_away_ppg_at_fitness_72</th><td><pre>0.771</pre></td></tr><tr><th>xg_calibration</th><td><pre>[
+ {
+  "bin": "0-0.1",
+  "shots": 1419242,
+  "mean_xg": 0.054,
+  "conversion": 0.056
+ },
+ {
+  "bin": "0.1-0.2",
+  "shots": 670233,
+  "mean_xg": 0.139,
+  "conversion": 0.144
+ },
+ {
+  "bin": "0.2-0.3",
+  "shots": 179054,
+  "mean_xg": 0.239,
+  "conversion": 0.25
+ },
+ {
+  "bin": "0.3-0.4",
+  "shots": 60653,
+  "mean_xg": 0.342,
+  "conversion": 0.358
+ },
+ {
+  "bin": "0.4-0.5",
+  "shots": 27011,
+  "mean_xg": 0.443,
+  "conversion": 0.465
+ },
+ {
+  "bin": "0.5-0.6",
+  "shots": 13483,
+  "mean_xg": 0.544,
+  "conversion": 0.565
+ },
+ {
+  "bin": "0.6-0.7",
+  "shots": 6704,
+  "mean_xg": 0.644,
+  "conversion": 0.662
+ },
+ {
+  "bin": "0.7-0.8",
+  "shots": 35675,
+  "mean_xg": 0.758,
+  "conversion": 0.778
+ },
+ {
+  "bin": "0.8-0.9",
+  "shots": 3877,
+  "mean_xg": 0.843,
+  "conversion": 0.879
+ }
+]</pre></td></tr></table>

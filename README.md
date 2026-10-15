@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Touchline (nome provisório)
 
-## Getting Started
+Jogo de gestão de futebol multiplayer assíncrono para browser: ligas privadas entre amigos, plantéis iniciais derivados do PlayerElo (Elo → OVR), jornadas simuladas lance a lance no servidor, mercado de transferências atómico e evolução independente por liga.
 
-First, run the development server:
+> O nome está em `src/lib/brand.ts` / `NEXT_PUBLIC_APP_NAME`.
+
+## Estado
+
+| Área | Estado |
+|---|---|
+| Schema Supabase, RLS, comandos SQL atómicos | ✅ testado num Postgres real (shim do `auth`) |
+| Importador PlayerElo (discover/preview/import/resume/audit/finalize) | ✅ testado contra API mock; ⏳ **falta validar com chave real** (esquemas não documentados) |
+| `initial-rating-v1` (Elo → OVR, potencial, valor) | ✅ testes de propriedades |
+| Motor de jogo determinístico + calibração 100k | ✅ |
+| Progressão (forma/fitness/moral/XP/OVR) + economia | ✅ simulação de várias épocas |
+| Jornadas idempotentes (lease, exactly-once), fim de época | ✅ incl. processadores concorrentes |
+| Mercado (IA, propostas entre managers, reservas, concorrência) | ✅ |
+| UI pt-PT (dashboard, liga, plantel, tática 2D, jogos, replay, tabela, mercado, finanças, definições, admin) | ✅ E2E Playwright local |
+| Deploy Vercel/Supabase | ⏳ instruções prontas (`docs/deployment.md`); não houve deploy (sem contas) |
+
+## Início rápido (local, sem chaves)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local
+# Postgres local:
+export LOCAL_PG_URL=postgres://postgres@localhost:5432
+npm run db:local:reset
+SUPABASE_DB_URL=$LOCAL_PG_URL/touchline_dev npm run seed:synthetic   # dados FICTÍCIOS
+# em .env.local: SUPABASE_DB_URL=$LOCAL_PG_URL/touchline_dev  AUTH_MODE=dev  DEV_AUTH_SECRET=<32+ chars>
+npm run dev    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Com Supabase real: ver [`docs/deployment.md`](docs/deployment.md). Importar ligas reais: [`docs/operator-guide.md`](docs/operator-guide.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Comandos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Comando | O quê |
+|---|---|
+| `npm run verify` | lint + typecheck + todos os testes Vitest |
+| `npm test` / `npm run test:integration` / `npm run test:e2e` | unitários / Postgres real / Playwright |
+| `npm run sim:calibrate` | 100 000 jogos → `reports/calibration-*.{json,html}` |
+| `npm run sim:seasons -- 10` | balanço de progressão e economia |
+| `npm run playerelo:*` | pipeline de importação (ver operator guide) |
+| `npm run seed:synthetic` | catálogo + snapshot fictícios |
 
-## Learn More
+## Documentação
 
-To learn more about Next.js, take a look at the following resources:
+- [Arquitetura](docs/architecture.md) · [Decisões e defaults](docs/decisions.md)
+- [Contrato de dados PlayerElo](docs/data-contract.md) · [Licenciamento](docs/data-licensing.md)
+- [Balanceamento do jogo](docs/game-balance.md) · [Custos](docs/costs.md)
+- [Deploy](docs/deployment.md) · [Guia do operador](docs/operator-guide.md)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Princípios
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- O browser nunca decide jogos nem dinheiro: comandos validados no Postgres, simulação só no servidor.
+- Reprodutível: `seed + engine_version + input_hash` por jogo.
+- Sem pay-to-win, sem compras, sem apostas. Sem logótipos/fotografias de terceiros.

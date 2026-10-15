@@ -1,0 +1,18 @@
+# Minimal Supabase CLI config (run `npx supabase init` if your CLI version asks for more keys).
+project_id = "touchline"
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

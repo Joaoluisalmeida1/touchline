@@ -1,0 +1,51 @@
+# Decisões (ADR resumido)
+
+Formato: decisão · porquê · como mudar. Todos os parâmetros de jogo estão em código versionado (`ENGINE_CONFIG`, `PROGRESSION`, `ECONOMY`, `games.settings_json`).
+
+## Arquitetura
+
+1. **Uma só app Next.js (sem monorepo).** Fronteiras de domínio por pastas: `src/engine/*` (puro, sem I/O), `src/integrations/*` (PlayerElo, catálogo), `src/server/*` (serviços, queries, actions). Porquê: deploy Vercel trivial, menos tooling; os engines continuam isolados e testáveis. Mudar: mover `src/engine` para `packages/` quando houver segundo consumidor.
+2. **Acesso à BD pelo servidor via `pg` com impersonação de papel** (`set local role authenticated` + `request.jwt.claims`), igual ao que o PostgREST faz. RLS e `auth.uid()` aplicam-se a todas as leituras/comandos do utilizador. Supabase Auth trata a identidade. Porquê: SQL completo (joins, transações), tudo testável num Postgres local, e a mesma política de segurança. Custo: precisa de `SUPABASE_DB_URL` (pooler de transações em serverless).
+3. **Mutações críticas em PL/pgSQL `SECURITY DEFINER`** (convites, clubes, escalações, propostas, transferências, ledger, finalização de jogos). Atomicidade, locks e idempotência ficam na BD. Ordem de locks: jogador → proposta → clubes (evita deadlocks; testado com aceitações concorrentes).
+4. **Motor e progressão em TypeScript puro**; a BD recebe um *payload* versionado e valida (golos = eventos, lease ativa, versões de jogadores).
+5. **Comandos só-servidor** (`create_game_tx`, `begin_matchday`, `finalize_fixture`, `complete_matchday`, `end_season`) não são executáveis por `authenticated`/`anon` (teste de invariantes).
+6. **Dev auth adapter** (`AUTH_MODE=dev`) só para testes locais sem Supabase; recusado se `VERCEL`/`VERCEL_ENV` existir ou `NODE_ENV=production`.
+
+## Produto (defaults pedidos)
+
+| Parâmetro | Default | Onde |
+|---|---|---|
+| Idioma | pt-PT | UI |
+| Timezone | `Europe/Lisbon`, persistência UTC | `games.timezone` |
+| Managers por liga | 2–20 (default 20), resto IA | `games.max_managers` |
+| Calendário | ida e volta, método do círculo, byes em número ímpar | `_generate_fixtures` |
+| Pontos | 3 / 1 / 0 | `settings_json.points_win/draw` |
+| Desempate | pontos, DG, GM, vitórias, id estável | `sortStandings` + query |
+| Plantel | mín. 16 / máx. 32 (transferências) | `settings_json.min_squad/max_squad` |
+| Avanço | manual (fallback universal) ou diário (cron) | `games.tick_mode` |
+| Dinheiro | `bigint` em cêntimos | todas as tabelas |
+| OVR | 1–99, inicial 40–95 | `initial-rating-v1` |
+| Checkpoint de OVR | a cada 4 jornadas, ±1 máx. | `PROGRESSION.checkpointEveryRounds` |
+
+## Regras simplificadas no MVP (documentadas, mudáveis)
+
+- **Contratos**: renovação automática por 2 épocas no fim do contrato, salário recalculado (`endOfSeasonPlayer`). Negociação é pós-MVP.
+- **Salários** pagos por jornada = salário semanal; receitas de bilheteira (casa), patrocínio (por jornada), prémios de resultado e prémios de classificação.
+- **Dívida**: o saldo pode ficar negativo por salários; transferências exigem `cash − reservado ≥ valor`.
+- **Reservas**: uma proposta reserva a verba até ser aceite/recusada/cancelada/expirada (3 dias). Evita *overspend* com propostas paralelas.
+- **IA de mercado**: clube IA responde de imediato — aceita se `valor ≥ preço pedido` (valor de mercado × 1,15–1,60 conforme importância no plantel, −0,20 em fim de contrato), senão recusa e devolve contraproposta. IA não compra (pós-MVP).
+- **Agentes livres**: não suportados no MVP.
+- **Lesões/castigos** contam em jogos (`injured_matches`), não em datas. Castigo: vermelho direto 2 jogos, 2.º amarelo 1 jogo, 5 amarelos acumulados 1 jogo.
+- **Idade**: só com data de nascimento verificada. A API PlayerElo documentada não expõe DOB → jogadores reais ficam `age = null`, sem envelhecimento numérico nem declínio por idade.
+- **Potencial**: inferido pelo jogo, oculto (só banda A–E visível; coluna sem `GRANT`).
+- **Convites**: código de 16 caracteres (80 bits), só o hash SHA-256 é guardado; 7 dias; rotação invalida o anterior; erro idêntico para inválido/expirado/revogado.
+- **Eliminação de liga**: não exposta no MVP. As FKs são `on delete cascade` a partir de `games`, por isso um `delete from games where id = …` (operador) remove tudo de forma consistente; recomendado `status = 'archived'`.
+
+## Agendamento
+
+Vercel Hobby: cron no máximo 1×/dia e precisão ±59 min (verificado em 2026-10-15). Por isso: botão manual idempotente + cron diário opcional (`vercel.json`, 19:00 UTC). Para kickoffs exatos: Vercel Pro (cron ao minuto) ou um worker dedicado que chame `/api/cron/process`.
+
+## Divergências encontradas com o enunciado
+
+- `/v1/leagues`, `/v1/leagues/{id}/players`, `/v1/clubs/{id}/players`, `/v1/players/{id}/value|style`, `/v1/usage` aparecem listados em `/api-access` mas **sem esquema de resposta** na documentação pública. O cliente aceita lista simples ou embrulhada e preserva campos desconhecidos. `offset` só está documentado para `/v1/players`; o importador deteta páginas repetidas e pára.
+- Limite Free documentado: 500 pedidos/mês e **10 pedidos/min** (o cliente usa 9/min por omissão).

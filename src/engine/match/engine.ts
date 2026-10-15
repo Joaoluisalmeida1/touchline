@@ -131,7 +131,7 @@ function weightedUnit(players: OnPitch[], lineWeights: Record<PositionGroup, num
 function computeUnits(t: Team): Units {
   const ps = onPitch(t);
   const n = ps.length;
-  const numbers = 1 - 0.075 * Math.max(0, 11 - n);
+  const numbers = 1 - 0.1 * Math.max(0, 11 - n);
   const gk = ps.find((p) => p.slot === "GK");
   const d = t.dayForm;
   return {
@@ -143,7 +143,7 @@ function computeUnits(t: Team): Units {
   };
 }
 
-const mentalityLogit = (m: Tactics["mentality"]): number => (m === "attacking" ? 0.22 : m === "defensive" ? -0.24 : 0);
+const mentalityLogit = (m: Tactics["mentality"]): number => (m === "attacking" ? 0.22 : m === "defensive" ? -0.22 : 0);
 
 export function simulateMatch(input: MatchInput, seed: string): MatchResult {
   const rng = createRng(`${ENGINE_VERSION}|${seed}`);
@@ -518,7 +518,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     if (!rng.chance(sigmoid(progLogit))) {
       const winner = pickWeighted(onPitch(def), defenderWeight);
       finish(true, winner);
-      if (def.tactics.transitions === "counter" && rng.chance(0.22)) transitionFor = def.side;
+      if (def.tactics.transitions === "counter" && rng.chance(0.18)) transitionFor = def.side;
       return;
     }
 
@@ -560,9 +560,13 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     }
 
     let chanceLogit = C.chanceBase + (att.units.attack - def.units.defense) / C.ratingScale + homeAdv
-      + mentalityLogit(att.tactics.mentality) - mentalityLogit(def.tactics.mentality) * 0.75 + context;
+      + mentalityLogit(att.tactics.mentality) + mentalityLogit(def.tactics.mentality) + context;
     if (isTransition) chanceLogit += C.transitionChanceBonus * (def.tactics.defensive_line === "high" ? 1.3 : 1);
-    if (def.tactics.defensive_line === "low") chanceLogit -= 0.12; // compact block
+    if (def.tactics.defensive_line === "low") chanceLogit -= 0.2; // compact block
+    if (def.tactics.pressing === "high" && !isTransition) chanceLogit += 0.2; // press beaten: space behind
+    if (att.tactics.passing_directness === "direct") chanceLogit -= 0.08; // hurried final ball
+    if (att.tactics.transitions === "counter" && !isTransition) chanceLogit -= 0.16; // less patient vs set defence
+    if (att.tactics.transitions === "possession" && !isTransition) chanceLogit += 0.05;
     if (def.tactics.pressing === "high" && isTransition) chanceLogit += 0.12; // space behind the press
     if (att.tactics.width === "wide" && def.tactics.width === "narrow") chanceLogit += 0.08;
     if (att.tactics.width === "narrow" && def.tactics.width === "wide") chanceLogit += 0.05;
