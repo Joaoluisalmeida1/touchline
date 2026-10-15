@@ -1,6 +1,6 @@
 # Balanceamento do jogo
 
-Todos os coeficientes são **hipóteses de protótipo**, não verdades empíricas. Mudar valores que alteram resultados obriga a subir a versão (`ENGINE_VERSION`, `INITIAL_RATING_VERSION`, `PROGRESSION_VERSION`, `ECONOMY_VERSION`).
+Todos os coeficientes são **hipóteses de protótipo**, não verdades empíricas. Mudar valores que alteram resultados obriga a subir a versão (`ENGINE_VERSION`, `INITIAL_RATING_VERSION`, `PROGRESSION_VERSION`, `ECONOMY_VERSION`). O teste golden master (`src/engine/golden.test.ts`) falha se o resultado mudar sem essa subida; ver [guia do operador](operator-guide.md#testes).
 
 ## 1. Rating inicial — `initial-rating-v1` (`src/engine/rating/initial-rating.ts`)
 
