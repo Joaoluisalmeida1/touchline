@@ -1,5 +1,5 @@
 import "server-only";
-import { withUser } from "./db";
+import { withService, withUser } from "./db";
 
 /** All reads run as the signed-in user (RLS enforced). Columns are explicit (game_players has hidden columns). */
 
@@ -162,7 +162,7 @@ export async function getPlayer(userId: string, gameId: string, playerId: string
         where s.game_player_id = $1 order by f.completed_at desc nulls last limit 10`, [playerId]);
     const ask = await c.query<{ ask: string | null }>(`select public.ai_asking_price($1) as ask`, [playerId]);
     const transfers = await c.query(
-      `select t.price_cents, t.completed_at, fc.name_snapshot as from_name, tc.name_snapshot as to_name
+      `select t.price_cents, t.completed_at, coalesce(fc.name_snapshot, t.external_from_name) as from_name, tc.name_snapshot as to_name
          from transfer_transactions t left join game_clubs fc on fc.id = t.from_club_id left join game_clubs tc on tc.id = t.to_club_id
         where t.player_id = $1 order by t.completed_at desc`, [playerId]);
     return { player: p.rows[0], log: log.rows, matches: matches.rows, askingPrice: ask.rows[0]?.ask ?? null, transfers: transfers.rows };
@@ -171,26 +171,97 @@ export async function getPlayer(userId: string, gameId: string, playerId: string
 
 export interface MarketFilters {
   position?: string; minOvr?: number; maxOvr?: number; maxPrice?: number; q?: string; listedOnly?: boolean; page?: number;
+  /** "" = every league in the dataset, "game" = only this game's league, otherwise a source_leagues id */
+  league?: string;
 }
+export interface MarketRow {
+  kind: "game" | "ext"; id: string; name_snapshot: string; position_group: PlayerRow["position_group"]; current_ovr: number;
+  potential_band: string; age: number | null; form: string; market_value_cents: string; listed_price: string | null;
+  club_name: string | null; manager_user_id: string | null; league_name: string | null;
+}
+
+/**
+ * Market search across the whole dataset: players already in this game (own league, RLS-equivalent filters) plus every
+ * other snapshot player not yet signed in this game ("external", bought from an AI club outside the league).
+ * Runs with the service connection because dataset_snapshot_players has no client grants — membership is checked
+ * inside the query and only public columns are returned (never potential_cap / development rate).
+ */
 export async function searchMarket(userId: string, gameId: string, f: MarketFilters) {
   const pageSize = 40;
-  return withUser(userId, async (c) => {
-    const rows = await c.query<PlayerRow & { club_name: string | null; manager_user_id: string | null; listed_price: string | null }>(
-      `select ${PLAYER_COLS}, gc.name_snapshot as club_name, gc.manager_user_id, tl.asking_price_cents as listed_price
-         from game_players p left join game_clubs gc on gc.id = p.club_id
-         left join transfer_listings tl on tl.player_id = p.id and tl.status = 'active'
-        where p.game_id = $1
-          and ($2::text is null or p.position_group = $2)
-          and p.current_ovr between $3 and $4
-          and ($5::bigint is null or coalesce(tl.asking_price_cents, p.market_value_cents) <= $5)
-          and ($6::text is null or p.name_snapshot ilike '%' || $6 || '%')
-          and (not $7 or tl.id is not null)
-          and (gc.manager_user_id is distinct from $8)
-        order by p.current_ovr desc, p.id limit $9 offset $10`,
+  const league = f.league ?? "";
+  return withService(async (c) => {
+    const rows = await c.query<MarketRow>(
+      `with g as (
+         select g.id, g.dataset_snapshot_id snap, g.source_league_id lg from games g
+          where g.id = $1 and exists (select 1 from game_members m where m.game_id = g.id and m.user_id = $8)
+       ), own as (
+         select 'game'::text kind, p.id, p.name_snapshot, p.position_group, p.current_ovr, p.potential_band, p.age, p.form::text form,
+                p.market_value_cents::text market_value_cents, tl.asking_price_cents::text listed_price, gc.name_snapshot club_name,
+                gc.manager_user_id, sl.name league_name, coalesce(tl.asking_price_cents, p.market_value_cents) price
+           from g join game_players p on p.game_id = g.id
+           left join game_clubs gc on gc.id = p.club_id
+           left join transfer_listings tl on tl.player_id = p.id and tl.status = 'active'
+           left join source_leagues sl on sl.id = g.lg
+          where (gc.manager_user_id is distinct from $8)
+            and ($11::text = '' or $11 = 'game' or $11 = g.lg::text)
+       ), ext as (
+         select 'ext'::text kind, sp.source_player_id id, sp.display_name name_snapshot, sp.position_group, sp.initial_ovr current_ovr,
+                case when sp.initial_potential >= 88 then 'A' when sp.initial_potential >= 82 then 'B' when sp.initial_potential >= 75 then 'C'
+                     when sp.initial_potential >= 68 then 'D' else 'E' end potential_band,
+                sp.age_at_import age, '0' form, (sp.base_value_eur * 100)::text market_value_cents, null::text listed_price,
+                dc.name club_name, null::uuid manager_user_id, sl.name league_name, sp.base_value_eur * 100 price
+           from g join dataset_snapshot_players sp on sp.snapshot_id = g.snap
+           join dataset_snapshot_clubs dc on dc.snapshot_id = g.snap and dc.source_club_id = sp.source_club_id
+           left join source_leagues sl on sl.id = dc.league_id
+          where not $7 and $11 <> 'game' and ($11 = '' or $11 = dc.league_id::text)
+            and not exists (select 1 from game_clubs x where x.game_id = g.id and x.source_club_id = sp.source_club_id)
+            and not exists (select 1 from game_players x where x.game_id = g.id and x.source_player_id = sp.source_player_id)
+       ), allp as (select * from own union all select * from ext)
+       select kind, id, name_snapshot, position_group, current_ovr, potential_band, age, form, market_value_cents, listed_price,
+              club_name, manager_user_id, league_name
+         from allp
+        where ($2::text is null or position_group = $2)
+          and current_ovr between $3 and $4
+          and ($5::bigint is null or price <= $5)
+          and ($6::text is null or name_snapshot ilike '%' || $6 || '%')
+          and (not $7 or listed_price is not null)
+        order by current_ovr desc, id limit $9 offset $10`,
       [gameId, f.position ?? null, f.minOvr ?? 1, f.maxOvr ?? 99, f.maxPrice ? f.maxPrice * 100 : null, f.q || null, !!f.listedOnly,
-        userId, pageSize + 1, ((f.page ?? 1) - 1) * pageSize]);
+        userId, pageSize + 1, ((f.page ?? 1) - 1) * pageSize, league]);
     return { rows: rows.rows.slice(0, pageSize), hasMore: rows.rows.length > pageSize, page: f.page ?? 1 };
   });
+}
+
+/** Leagues available in this game's dataset (for the market filter). */
+export async function getMarketLeagues(userId: string, gameId: string) {
+  return withService(async (c) => (await c.query<{ id: string; name: string; country: string | null; own: boolean }>(
+    `select distinct l.id, l.name, l.country, l.id = g.source_league_id own
+       from games g join dataset_snapshot_clubs dc on dc.snapshot_id = g.dataset_snapshot_id join source_leagues l on l.id = dc.league_id
+      where g.id = $1 and exists (select 1 from game_members m where m.game_id = g.id and m.user_id = $2)
+      order by own desc, l.name`, [gameId, userId])).rows);
+}
+
+/** A not-yet-signed player from outside the game's league, with the external club's asking price. */
+export async function getExternalPlayer(userId: string, gameId: string, sourcePlayerId: string) {
+  return withService(async (c) => (await c.query<{
+    id: string; name: string; position_group: PlayerRow["position_group"]; position_detail: string | null; ovr: number; potential_band: string;
+    age: number | null; value_cents: string; ask_cents: string; club_id: string; club_name: string; club_short: string | null; league_name: string | null;
+    signed_player_id: string | null; in_league: boolean;
+  }>(
+    `select sp.source_player_id id, sp.display_name name, sp.position_group, sp.position_detail, sp.initial_ovr ovr,
+            case when sp.initial_potential >= 88 then 'A' when sp.initial_potential >= 82 then 'B' when sp.initial_potential >= 75 then 'C'
+                 when sp.initial_potential >= 68 then 'D' else 'E' end potential_band,
+            sp.age_at_import age, (sp.base_value_eur * 100)::text value_cents,
+            public.external_asking_price(g.dataset_snapshot_id, sp.source_player_id)::text ask_cents,
+            sp.source_club_id club_id, dc.name club_name, dc.short_name club_short, l.name league_name,
+            (select x.id from game_players x where x.game_id = g.id and x.source_player_id = sp.source_player_id) signed_player_id,
+            exists (select 1 from game_clubs x where x.game_id = g.id and x.source_club_id = sp.source_club_id) in_league
+       from games g join dataset_snapshot_players sp on sp.snapshot_id = g.dataset_snapshot_id
+       left join dataset_snapshot_clubs dc on dc.snapshot_id = g.dataset_snapshot_id and dc.source_club_id = sp.source_club_id
+       left join source_leagues l on l.id = dc.league_id
+      where g.id = $1 and sp.source_player_id = $3
+        and exists (select 1 from game_members m where m.game_id = g.id and m.user_id = $2)`,
+    [gameId, userId, sourcePlayerId])).rows[0] ?? null);
 }
 
 export async function getOffers(userId: string, gameId: string) {
@@ -205,7 +276,7 @@ export async function getOffers(userId: string, gameId: string) {
 
 export async function getRecentTransfers(userId: string, gameId: string) {
   return withUser(userId, async (c) => (await c.query(
-    `select t.price_cents, t.completed_at, p.id as player_id, p.name_snapshot as player_name, fc.name_snapshot as from_name, tc.name_snapshot as to_name
+    `select t.price_cents, t.completed_at, p.id as player_id, p.name_snapshot as player_name, coalesce(fc.name_snapshot, t.external_from_name) as from_name, tc.name_snapshot as to_name
        from transfer_transactions t join game_players p on p.id = t.player_id
        left join game_clubs fc on fc.id = t.from_club_id left join game_clubs tc on tc.id = t.to_club_id
       where t.game_id = $1 order by t.completed_at desc limit 20`, [gameId])).rows);
