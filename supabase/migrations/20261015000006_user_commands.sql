@@ -263,6 +263,7 @@ declare
   v_o public.transfer_offers; v_p public.game_players; v_buyer public.game_clubs; v_seller public.game_clubs;
   v_game public.games; v_min_squad integer; v_max_squad integer; v_count integer; v_first uuid; v_second uuid;
 begin
+  perform 1 from public.game_players where id = (select player_id from public.transfer_offers where id = p_offer_id) for update;
   select * into v_o from public.transfer_offers where id = p_offer_id for update;
   if v_o.status <> 'pending' then perform public._fail('offer_closed', 'Esta proposta já não está ativa.'); end if;
   select * into v_game from public.games where id = v_o.game_id;
@@ -353,7 +354,7 @@ begin
                               'counter_amount_cents', v_offer.counter_amount_cents);
   end if;
 
-  select * into v_p from public.game_players where id = p_player_id;
+  select * into v_p from public.game_players where id = p_player_id for update;
   if not found or not public.is_game_member(v_p.game_id) then perform public._fail('not_found', 'Jogador inexistente.'); end if;
   select * into v_game from public.games where id = v_p.game_id;
   if v_game.status not in ('setup','active') then perform public._fail('game_closed', 'Liga fechada.'); end if;
@@ -413,6 +414,8 @@ create or replace function public.respond_offer(p_offer_id uuid, p_accept boolea
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_uid uuid := auth.uid(); v_o public.transfer_offers; v_buyer_mgr uuid;
 begin
+  -- lock order everywhere: player -> offer -> clubs (prevents deadlocks between competing accepts/cancels)
+  perform 1 from public.game_players where id = (select player_id from public.transfer_offers where id = p_offer_id) for update;
   select * into v_o from public.transfer_offers where id = p_offer_id for update;
   if not found or not public.manages_club(v_o.seller_club_id) then perform public._fail('forbidden', 'Proposta inexistente.'); end if;
   if v_o.status <> 'pending' then
@@ -439,6 +442,7 @@ create or replace function public.cancel_offer(p_offer_id uuid) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_o public.transfer_offers;
 begin
+  perform 1 from public.game_players where id = (select player_id from public.transfer_offers where id = p_offer_id) for update;
   select * into v_o from public.transfer_offers where id = p_offer_id for update;
   if not found or not public.manages_club(v_o.buyer_club_id) then perform public._fail('forbidden', 'Proposta inexistente.'); end if;
   if v_o.status <> 'pending' then return jsonb_build_object('status', v_o.status, 'replayed', true); end if;

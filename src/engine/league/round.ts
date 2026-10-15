@@ -83,11 +83,13 @@ export function processRound(args: {
   clubs: LeagueClub[];
   players: LeaguePlayer[];
   fixtures: RoundFixture[];
+  /** clubs whose fixture this round was already completed (crash-resume): they get no bye updates */
+  alreadyPlayedClubIds?: string[];
 }): RoundOutcome {
   const { gameId, season, round, clubs, players, fixtures } = args;
   const clubById = new Map(clubs.map((c) => [c.id, c]));
   const squadOf = (clubId: string) => players.filter((p) => p.club_id === clubId).sort((a, b) => (a.id < b.id ? -1 : 1));
-  const playing = new Set<string>();
+  const playing = new Set<string>(args.alreadyPlayedClubIds ?? []);
   const out: FixtureOutcome[] = [];
 
   for (const f of [...fixtures].sort((a, b) => (a.id < b.id ? -1 : 1))) {
