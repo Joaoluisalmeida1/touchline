@@ -3,7 +3,7 @@
  * Pure: (input, seed) -> result. No DB, no clock, no Math.random.
  * Every stat (goals, assists, xG, shots, cards, ratings) is derived from the same event stream.
  */
-import { clamp, createRng, round1, round3, sigmoid, type Rng } from "../common/rng";
+import { clamp, createRng, round1, round3, sigmoid } from "../common/rng";
 import type { PlayerProfile, PositionGroup, Slot, Tactics } from "../common/types";
 import { SLOT_GROUP, SLOT_SIDE, slotSuitability } from "../lineup/formations";
 import { ENGINE_CONFIG as C, ENGINE_VERSION } from "./config";

@@ -6,7 +6,24 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:all": "vitest run",
+    "test:e2e": "playwright test",
+    "db:local:reset": "scripts/db/local-reset.sh touchline_dev",
+    "seed:synthetic": "tsx scripts/seed/synthetic.ts",
+    "playerelo:discover": "tsx scripts/playerelo/discover.ts",
+    "playerelo:preview": "tsx scripts/playerelo/preview.ts",
+    "playerelo:import": "tsx scripts/playerelo/import.ts",
+    "playerelo:resume": "tsx scripts/playerelo/resume.ts",
+    "playerelo:audit": "tsx scripts/playerelo/audit.ts",
+    "playerelo:finalize": "tsx scripts/playerelo/finalize.ts",
+    "sim:quick": "tsx scripts/sim-calibration/quick.ts",
+    "sim:calibrate": "tsx scripts/sim-calibration/calibrate.ts",
+    "sim:seasons": "tsx scripts/sim-calibration/seasons.ts",
+    "verify": "npm run lint && npm run typecheck && npm run test:all"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -34,5 +51,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=20.9"
   }
 }
