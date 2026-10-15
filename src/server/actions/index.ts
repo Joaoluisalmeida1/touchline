@@ -13,6 +13,7 @@ import { domainError } from "../pg";
 import { requireUser, signIn, signOut, signUp } from "../auth";
 import { createGame, CreateGameInput } from "../services/create-game";
 import { processNextMatchday } from "../services/matchday";
+import { FORMATIONS, SLOTS } from "../../engine/common/types";
 
 export interface ActionState {
   ok?: boolean;
@@ -168,12 +169,15 @@ export async function processMatchdayAction(_: ActionState, form: FormData): Pro
 }
 
 /* ------------------------------- squad / tactics ------------------------------- */
-const Slot = z.enum(["GK", "LB", "CB", "RB", "LWB", "RWB", "DM", "CM", "AM", "LM", "RM", "LW", "RW", "ST"]);
+const Slot = z.enum(SLOTS);
 const LineupInput = z.object({
   gameId: uuid,
-  formation: z.enum(["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "3-5-2", "5-3-2"]),
-  starters: z.array(z.object({ player_id: uuid, slot: Slot })).length(11, "Escolhe 11 titulares."),
+  formation: z.enum(FORMATIONS),
+  starters: z.array(z.object({ player_id: uuid, slot: Slot, role: z.string().max(40).nullish() })).length(11, "Escolhe 11 titulares."),
   bench: z.array(uuid).max(9),
+  instructions: z.object({
+    captain: uuid.nullish(), penalty_taker: uuid.nullish(), freekick_taker: uuid.nullish(), corner_taker: uuid.nullish(),
+  }).default({}),
   tactics: z.object({
     mentality: z.enum(["defensive", "balanced", "attacking"]), tempo: z.enum(["slow", "normal", "high"]),
     pressing: z.enum(["low", "medium", "high"]), defensive_line: z.enum(["low", "medium", "high"]),
@@ -182,20 +186,50 @@ const LineupInput = z.object({
   }),
 });
 
-export async function saveLineupAction(input: z.infer<typeof LineupInput>): Promise<ActionState> {
+export async function saveLineupAction(input: z.input<typeof LineupInput>): Promise<ActionState> {
   const user = await requireUser();
   const p = LineupInput.safeParse(input);
   if (!p.success) return { error: p.error.issues[0].message };
+  const ins = Object.fromEntries(Object.entries(p.data.instructions).filter(([, v]) => v));
   try {
     await withUser(user.id, async (c) => {
       await c.query(`select public.save_tactics($1, $2)`, [p.data.gameId, JSON.stringify({ ...p.data.tactics, formation: p.data.formation })]);
-      await c.query(`select public.save_lineup($1, $2, $3, $4)`, [p.data.gameId, p.data.formation, JSON.stringify(p.data.starters), JSON.stringify(p.data.bench)]);
+      await c.query(`select public.save_lineup_v2($1, $2, $3, $4, $5)`, [p.data.gameId, p.data.formation,
+        JSON.stringify(p.data.starters.map((s) => ({ player_id: s.player_id, slot: s.slot, ...(s.role ? { role: s.role } : {}) }))),
+        JSON.stringify(p.data.bench), JSON.stringify(ins)]);
     });
     revalidatePath(`/g/${p.data.gameId}`, "layout");
     return { ok: true, message: "Escalação e tática guardadas." };
   } catch (e) {
     return fail(e);
   }
+}
+
+const PresetInput = z.object({ gameId: uuid, name: z.string().trim().min(1, "Dá um nome.").max(40), payload: z.record(z.string(), z.unknown()) });
+export async function saveTacticPresetAction(input: z.input<typeof PresetInput>): Promise<ActionState> {
+  const p = PresetInput.safeParse(input);
+  if (!p.success) return { error: p.error.issues[0].message };
+  return userCommand(p.data.gameId, `select public.save_tactic_preset($1, $2, $3) as id`, [p.data.gameId, p.data.name, JSON.stringify(p.data.payload)], `Predefinição "${p.data.name}" guardada.`);
+}
+export async function archiveTacticPresetAction(input: { gameId: string; presetId: string }): Promise<ActionState> {
+  const gameId = uuid.parse(input.gameId);
+  return userCommand(gameId, `select public.archive_tactic_preset($1)`, [uuid.parse(input.presetId)], "Predefinição apagada.");
+}
+export async function setPreferredSlotAction(input: { gameId: string; playerId: string; slot: string }): Promise<ActionState> {
+  const gameId = uuid.parse(input.gameId);
+  const slot = Slot.safeParse(input.slot);
+  if (!slot.success) return { error: "Posição inválida." };
+  return userCommand(gameId, `select public.set_preferred_slot($1, $2)`, [uuid.parse(input.playerId), slot.data], "Posição preferida definida.");
+}
+export async function setShirtNumberAction(input: { gameId: string; playerId: string; number: number | null }): Promise<ActionState> {
+  const gameId = uuid.parse(input.gameId);
+  const n = z.number().int().min(1, "Número entre 1 e 99.").max(99, "Número entre 1 e 99.").nullable().safeParse(input.number);
+  if (!n.success) return { error: n.error.issues[0].message };
+  return userCommand(gameId, `select public.set_shirt_number($1, $2)`, [uuid.parse(input.playerId), n.data], n.data ? `Número ${n.data} atribuído.` : "Número removido.");
+}
+export async function autoNumberSquadAction(input: { gameId: string }): Promise<ActionState> {
+  const gameId = uuid.parse(input.gameId);
+  return userCommand(gameId, `select public.auto_number_squad($1) as n`, [gameId], "Números atribuídos.");
 }
 
 /* ------------------------------- market ------------------------------- */

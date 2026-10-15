@@ -66,3 +66,20 @@ Um 85 nunca chegou a 90 numa época (teste). OVR médio da liga desce lentamente
 Salário semanal = €3 000 × e^(0,13·(OVR−65)) × (0,6 + 0,8·reputação/100). Saldo inicial = 12% do valor do plantel + €40 000 × reputação. Por jornada: patrocínio €60 000 + 28·rep²; bilheteira (casa) €150 000 + 60·rep²; prémio de vitória €120 000 / empate €40 000. Fim de época: €40 M repartidos linearmente pela classificação + €8 M ao campeão. Valor de mercado alvo = fórmula(OVR, posição, idade) × √(âncora do fornecedor) × forma × contrato × potencial, aproximado 15% por checkpoint (sem saltos), mínimo €50 000.
 
 Simulação de 6 épocas: nenhum clube em falência sistemática, valor médio +20% em 6 épocas (< 2×), caixa entre ~€14 M e ~€117 M.
+
+## match-v1.1.0 — formações, funções e posições (2026-10-15)
+
+- **17 formações** (`src/engine/lineup/formations.ts`, posições + coordenadas). Cada formação tem um *shape*
+  (peso de cada posição nas linhas defesa/meio/ataque e largura). Desvios face ao 4-3-3 de referência somam
+  pontos às unidades: defesa ×1.4, meio-campo ×1.15, ataque ×1.55 por unidade de linha; a largura altera a
+  proporção de cabeceamentos (±10%/posição aberta). Round robin de 20 400 jogos com equipas iguais:
+  PPG entre 1.32 e 1.39 (ruído ≈ ±0.025) — nenhuma formação dominante, estilos diferentes (golos 1.29–1.43/jogo).
+- **Funções** (`roles.ts`, ~30): trade-offs pequenos (±0.2–0.5 pontos em controlo/ataque/defesa, multiplicadores de
+  remate/criação/desgaste). A função por omissão de cada posição é neutra. Efeito medido por função: |ΔPPG| ≤ 0.04.
+- **Capitão**: +0.25 pontos (+0.015 por ponto de OVR acima de 70, máx. ~0.5) enquanto em campo.
+- **Marcadores** de penáltis/livres/cantos: usados se estiverem em campo; senão o motor escolhe.
+- **Posição preferida + familiaridade**: especialista 1.0 na posição, valores relacionados nas vizinhas (ex. DE→DD 0.94);
+  generalista (sem posição) 0.97 em todo o setor. Familiaridade +4.5 por 90 min numa posição (máx. 100) e fecha até
+  80% da diferença para 1.0. Ao atingir 25 numa posição, o jogador torna-se especialista dela (nunca sobrepõe a escolha do
+  treinador). O treinador pode definir a posição 1× por época.
+- Script: `npx tsx scripts/sim-calibration/formations.ts [jogosPorPar] [jogosPorFunção]`.

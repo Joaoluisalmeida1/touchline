@@ -1,4 +1,4 @@
-import type { Formation, PlayerProfile, PositionGroup, Slot, Tactics } from "../common/types";
+import type { Formation, LineupInstructions, PlayerProfile, PositionGroup, Slot, Tactics } from "../common/types";
 
 export interface MatchPlayerInput {
   id: string;
@@ -6,6 +6,9 @@ export interface MatchPlayerInput {
   position_group: PositionGroup;
   position_detail?: string | null;
   slot?: Slot; // starters only
+  role?: string | null; // starters only; validated against the slot (falls back to the slot default)
+  preferred_slot?: Slot | null;
+  familiarity?: Partial<Record<Slot, number>> | null;
   ovr: number; // 1..99 structural ability
   profile?: Partial<PlayerProfile>;
   fitness: number; // 0..100 at kickoff
@@ -21,6 +24,7 @@ export interface MatchTeamInput {
   tactics: Tactics;
   starters: MatchPlayerInput[];
   bench: MatchPlayerInput[];
+  instructions?: LineupInstructions;
 }
 
 export interface MatchInput {
@@ -52,6 +56,8 @@ export interface PlayerMatchStats {
   club_id: string;
   side: "home" | "away";
   started: boolean;
+  /** slot occupied at the end of the player's time on the pitch (null if unused) */
+  slot: Slot | null;
   minutes: number;
   rating: number | null;
   goals: number;

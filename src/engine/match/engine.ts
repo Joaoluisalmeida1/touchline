@@ -5,7 +5,8 @@
  */
 import { clamp, createRng, round1, round3, sigmoid } from "../common/rng";
 import type { PlayerProfile, PositionGroup, Slot, Tactics } from "../common/types";
-import { SLOT_GROUP, SLOT_SIDE, slotSuitability } from "../lineup/formations";
+import { REFERENCE_SHAPE, SLOT_GROUP, SLOT_SHAPE, SLOT_SIDE, slotFit } from "../lineup/formations";
+import { resolveRole, type RoleDef } from "../lineup/roles";
 import { ENGINE_CONFIG as C, ENGINE_VERSION } from "./config";
 import type {
   EventType, MatchEvent, MatchInput, MatchPlayerInput, MatchResult, MatchTeamInput, PlayerMatchStats, TeamMatchStats,
@@ -24,6 +25,7 @@ interface OnPitch {
   input: MatchPlayerInput;
   profile: PlayerProfile;
   slot: Slot;
+  role: RoleDef;
   stamina: number;
   yellow: number;
   onPitch: boolean;
@@ -80,7 +82,7 @@ function profileOf(p: MatchPlayerInput): PlayerProfile {
 function makeStats(p: MatchPlayerInput, clubId: string, side: Side, started: boolean): PlayerMatchStats {
   return {
     player_id: p.id, club_id: clubId, side, started, minutes: 0, rating: null, goals: 0, own_goals: 0, assists: 0,
-    shots: 0, shots_on_target: 0, xg: 0, passes_attempted: 0, passes_completed: 0, tackles: 0, interceptions: 0,
+    slot: null, shots: 0, shots_on_target: 0, xg: 0, passes_attempted: 0, passes_completed: 0, tackles: 0, interceptions: 0,
     saves: 0, fouls: 0, cards_yellow: 0, cards_red: 0, clean_sheet: false, goals_conceded_on_pitch: 0,
     stamina_end: p.fitness, injury: null,
   };
@@ -88,11 +90,11 @@ function makeStats(p: MatchPlayerInput, clubId: string, side: Side, started: boo
 
 function buildTeam(input: MatchTeamInput, side: Side, dayForm: number): Team {
   const starters: OnPitch[] = input.starters.map((p) => ({
-    input: p, profile: profileOf(p), slot: p.slot ?? "CM", stamina: clamp(p.fitness, 20, 100), yellow: 0,
+    input: p, profile: profileOf(p), slot: p.slot ?? "CM", role: resolveRole(p.slot ?? "CM", p.role), stamina: clamp(p.fitness, 20, 100), yellow: 0,
     onPitch: true, wasOnPitch: true, started: true, minIn: 0, minOut: null, stats: makeStats(p, input.club_id, side, true),
   }));
   const bench: OnPitch[] = input.bench.map((p) => ({
-    input: p, profile: profileOf(p), slot: p.slot ?? "CM", stamina: clamp(p.fitness, 20, 100), yellow: 0,
+    input: p, profile: profileOf(p), slot: p.slot ?? "CM", role: resolveRole(p.slot ?? "CM", null), stamina: clamp(p.fitness, 20, 100), yellow: 0,
     onPitch: false, wasOnPitch: false, started: false, minIn: -1, minOut: null, stats: makeStats(p, input.club_id, side, false),
   }));
   const t: Team = {
@@ -108,7 +110,7 @@ const onPitch = (t: Team): OnPitch[] => t.players.filter((p) => p.onPitch);
 
 /** Effective rating of a player right now (bounded modifiers, no double counting with profiles). */
 function eff(p: OnPitch): number {
-  const suit = slotSuitability(p.input.position_group, p.slot, p.input.position_detail);
+  const suit = slotFit(p.input, p.slot);
   const staminaF = 1 - Math.max(0, 78 - p.stamina) * 0.0045;
   const formF = 1 + C.formEffect * clamp(p.input.form, -3, 3) / 3;
   const moraleF = 1 + C.moraleEffect * clamp((p.input.morale - 60) / 40, -1, 1);
@@ -134,13 +136,42 @@ function computeUnits(t: Team): Units {
   const numbers = 1 - 0.1 * Math.max(0, 11 - n);
   const gk = ps.find((p) => p.slot === "GK");
   const d = t.dayForm;
+  // formation structure: line weights of the outfielders on the pitch, normalised to 10 outfielders
+  const outfield = ps.filter((p) => p.slot !== "GK");
+  const shape = { def: 0, mid: 0, att: 0 };
+  for (const p of outfield) {
+    const x = SLOT_SHAPE[p.slot];
+    shape.def += x.def; shape.mid += x.mid; shape.att += x.att;
+  }
+  const norm = outfield.length > 0 ? 10 / outfield.length : 1;
+  const sDef = C.lineEffect.def * (shape.def * norm - REFERENCE_SHAPE.def);
+  const sMid = C.lineEffect.mid * (shape.mid * norm - REFERENCE_SHAPE.mid);
+  const sAtt = C.lineEffect.att * (shape.att * norm - REFERENCE_SHAPE.att);
+  // roles
+  let rc = 0, ra = 0, rd = 0;
+  for (const p of ps) {
+    rc += p.role.mods.control ?? 0;
+    ra += p.role.mods.attack ?? 0;
+    rd += p.role.mods.defense ?? 0;
+  }
+  // captain
+  const capId = t.input.instructions?.captain;
+  const cap = capId ? ps.find((p) => p.input.id === capId) : undefined;
+  const lead = cap ? C.captainBase + C.captainPerPoint * clamp(cap.input.ovr - 70, -10, 15) : 0;
   return {
-    control: (weightedUnit(ps, { GK: 0.1, DEF: 0.35, MID: 1, ATT: 0.35 }, "creation") + d) * numbers,
-    attack: (weightedUnit(ps, { GK: 0, DEF: 0.15, MID: 0.55, ATT: 1 }, "attack") + d) * numbers,
-    defense: (weightedUnit(ps, { GK: 0.25, DEF: 1, MID: 0.45, ATT: 0.1 }, "defense") + d) * numbers,
+    control: (weightedUnit(ps, { GK: 0.1, DEF: 0.35, MID: 1, ATT: 0.35 }, "creation") + d + sMid + rc + lead) * numbers,
+    attack: (weightedUnit(ps, { GK: 0, DEF: 0.15, MID: 0.55, ATT: 1 }, "attack") + d + sAtt + ra + lead) * numbers,
+    defense: (weightedUnit(ps, { GK: 0.25, DEF: 1, MID: 0.45, ATT: 0.1 }, "defense") + d + sDef + rd + lead) * numbers,
     keeper: gk ? eff(gk) + d * 0.5 : 30,
     n,
   };
+}
+
+/** Team strength preview for the lineup editor (no day form, no randomness). Same code path as the match. */
+export function previewTeamStrength(team: MatchTeamInput): { control: number; attack: number; defense: number; keeper: number } {
+  const t = buildTeam(team, "home", 0);
+  const u = t.units;
+  return { control: round1(u.control), attack: round1(u.attack), defense: round1(u.defense), keeper: round1(u.keeper) };
 }
 
 const mentalityLogit = (m: Tactics["mentality"]): number => (m === "attacking" ? 0.22 : m === "defensive" ? -0.22 : 0);
@@ -185,18 +216,23 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     const g = SLOT_GROUP[p.slot];
     let base = g === "ATT" ? 3.2 : p.slot === "AM" ? 2.2 : g === "MID" ? (p.slot === "DM" ? 0.5 : 1.1) : g === "DEF" ? (p.slot === "CB" ? (header ? 1.4 : 0.22) : 0.5) : 0;
     if (header && g === "ATT") base *= 1.1;
-    return base * Math.pow(p.profile.attack / 60, header ? 0.6 : 1.4) * (eff(p) / 70);
+    return base * Math.pow(p.profile.attack / 60, header ? 0.6 : 1.4) * (eff(p) / 70) * (p.role.mods.shot ?? 1);
   };
   const creatorWeight = (p: OnPitch, wide: boolean): number => {
     const g = SLOT_GROUP[p.slot];
     let base = g === "MID" ? 1.6 : g === "ATT" ? 1.2 : g === "DEF" ? 0.55 : 0.03;
     if (wide && SLOT_SIDE[p.slot] !== "C") base *= 2.2;
-    return base * (p.profile.creation / 60) * (eff(p) / 70);
+    return base * (p.profile.creation / 60) * (eff(p) / 70) * (p.role.mods.create ?? 1);
   };
   const defenderWeight = (p: OnPitch): number => {
     const g = SLOT_GROUP[p.slot];
     const base = g === "DEF" ? 1.5 : g === "MID" ? 1.1 : g === "ATT" ? 0.35 : 0.05;
     return base * (p.profile.defense / 60);
+  };
+
+  const taker = (t: Team, key: "penalty_taker" | "freekick_taker" | "corner_taker"): OnPitch | undefined => {
+    const id = t.input.instructions?.[key];
+    return id ? onPitch(t).find((p) => p.input.id === id) : undefined;
   };
 
   // ---------- passing volume ----------
@@ -232,7 +268,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
       if (gk && victim) doSub(t, victim, gk, "GK", "keeper_sent_off");
     } else if (p.slot === "GK") {
       const stand = onPitch(t).sort((a, b) => eff(a) - eff(b))[0];
-      if (stand) stand.slot = "GK";
+      if (stand) { stand.slot = "GK"; stand.role = resolveRole("GK", null); }
       t.units = computeUnits(t);
     }
   };
@@ -244,6 +280,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     inn.wasOnPitch = true;
     inn.minIn = minuteOf(clock);
     inn.slot = slot;
+    inn.role = resolveRole(slot, slot === out.slot && out.role.slots.includes(slot) ? out.role.id : null);
     t.subsUsed++;
     emit(t.side, "substitution", inn, out, { reason, slot });
     t.units = computeUnits(t);
@@ -252,7 +289,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
   const bestBenchFor = (t: Team, slot: Slot): OnPitch | undefined => {
     const cands = t.bench.filter((b) => !b.wasOnPitch && (slot === "GK" ? b.input.position_group === "GK" : b.input.position_group !== "GK"));
     return cands.sort((a, b) =>
-      b.input.ovr * slotSuitability(b.input.position_group, slot) - a.input.ovr * slotSuitability(a.input.position_group, slot)
+      b.input.ovr * slotFit(b.input, slot) - a.input.ovr * slotFit(a.input, slot)
       || (a.input.id < b.input.id ? -1 : 1))[0];
   };
 
@@ -309,7 +346,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     for (const p of onPitch(t)) {
       const phys = 1.15 - p.profile.physical / 200; // physical 100 => 0.65x drain
       const gk = p.slot === "GK" ? 0.25 : 1;
-      p.stamina = Math.max(0, p.stamina - base * phys * gk * dtSeconds / 5400);
+      p.stamina = Math.max(0, p.stamina - base * phys * gk * (p.role.mods.drain ?? 1) * dtSeconds / 5400);
     }
     t.units = computeUnits(t);
   };
@@ -354,7 +391,8 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     const ps = onPitch(att).filter((p) => p.slot !== "GK" || kind === "penalty");
     if (ps.length === 0) return;
     const header = kind === "header" || kind === "corner_header";
-    const shooter = presetShooter ?? (kind === "penalty" || kind === "free_kick"
+    const chosen = kind === "penalty" ? taker(att, "penalty_taker") : kind === "free_kick" ? taker(att, "freekick_taker") : undefined;
+    const shooter = presetShooter ?? chosen ?? (kind === "penalty" || kind === "free_kick"
       ? ps.slice().sort((a, b) => b.profile.set_pieces + eff(b) - (a.profile.set_pieces + eff(a)))[0]
       : pickWeighted(ps, (p) => shooterWeight(p, header)));
     const keeper = onPitch(def).find((p) => p.slot === "GK");
@@ -401,8 +439,9 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
       if (rng.chance(ASSIST_P[kind])) {
         const mates = onPitch(att).filter((p) => p !== shooter);
         if (mates.length) {
+          const ct = taker(att, "corner_taker");
           assister = kind === "corner_header"
-            ? mates.slice().sort((a, b) => b.profile.set_pieces - a.profile.set_pieces)[0]
+            ? (ct && ct !== shooter ? ct : mates.slice().sort((a, b) => b.profile.set_pieces - a.profile.set_pieces)[0])
             : pickWeighted(mates, (p) => creatorWeight(p, wide));
           assister.stats.assists++;
         }
@@ -443,8 +482,8 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
 
   const corner = (att: Team, def: Team) => {
     att.stats.corners++;
-    const taker = onPitch(att).slice().sort((a, b) => b.profile.set_pieces - a.profile.set_pieces)[0];
-    emit(att.side, "corner", taker ?? null, null, {});
+    const cTaker = taker(att, "corner_taker") ?? onPitch(att).slice().sort((a, b) => b.profile.set_pieces - a.profile.set_pieces)[0];
+    emit(att.side, "corner", cTaker ?? null, null, {});
     clock += 25;
     if (rng.chance(C.cornerShotProb)) shoot(att, def, "corner_header");
   };
@@ -523,7 +562,8 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     }
 
     // 3) final third
-    if (rng.chance(C.offsidePerFinalThird * (def.tactics.defensive_line === "high" ? 1.8 : def.tactics.defensive_line === "low" ? 0.5 : 1))) {
+    const offRole = 1 + onPitch(att).reduce((acc, p) => acc + ((p.role.mods.offside ?? 1) - 1), 0);
+    if (rng.chance(C.offsidePerFinalThird * offRole * (def.tactics.defensive_line === "high" ? 1.8 : def.tactics.defensive_line === "low" ? 0.5 : 1))) {
       const off = pickWeighted(onPitch(att).filter((p) => SLOT_GROUP[p.slot] === "ATT").length ? onPitch(att).filter((p) => SLOT_GROUP[p.slot] === "ATT") : onPitch(att), () => 1);
       att.stats.offsides++;
       finish(true);
@@ -583,11 +623,17 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     const wideBias = att.tactics.width === "wide" ? 1.5 : att.tactics.width === "narrow" ? 0.6 : 1;
     const oneOnOneBias = (isTransition ? 2.3 : 1) * (def.tactics.defensive_line === "high" ? 1.6 : def.tactics.defensive_line === "low" ? 0.6 : 1);
     const outsideBias = def.tactics.defensive_line === "low" ? 1.35 : 1;
+    const attPs = onPitch(att);
+    const wideCount = attPs.reduce((acc, p) => acc + SLOT_SHAPE[p.slot].wide, 0);
+    const shapeHeader = clamp(1 + C.widthHeaderEffect * (wideCount - REFERENCE_SHAPE.wide), 0.5, 1.5);
+    const rHeader = attPs.reduce((acc, p) => acc + (p.role.mods.header ?? 0), 0);
+    const rOne = attPs.reduce((acc, p) => acc + (p.role.mods.oneOnOne ?? 0), 0);
+    const rOut = attPs.reduce((acc, p) => acc + (p.role.mods.outside ?? 0), 0);
     const kinds: { k: ShotKind; w: number }[] = [
       { k: "open_box", w: 0.45 },
-      { k: "outside_box", w: 0.3 * outsideBias },
-      { k: "header", w: 0.13 * wideBias },
-      { k: "one_on_one", w: 0.06 * oneOnOneBias },
+      { k: "outside_box", w: Math.max(0.05, 0.3 * outsideBias + rOut) },
+      { k: "header", w: Math.max(0.02, 0.13 * wideBias * shapeHeader + rHeader) },
+      { k: "one_on_one", w: Math.max(0.01, 0.06 * oneOnOneBias + rOne) },
     ];
     const kind = rng.pickWeighted(kinds, (x) => x.w).k;
     shoot(att, def, kind);
@@ -643,6 +689,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
       }
       const from = p.minIn;
       const to = p.minOut ?? fullMinutes;
+      p.stats.slot = p.slot;
       p.stats.minutes = clamp(to - from, 0, 130);
       p.stats.goals_conceded_on_pitch = goalsAgainst.filter((e) => e.minute >= from && e.minute <= to).length;
       p.stats.clean_sheet = p.stats.minutes >= 60 && p.stats.goals_conceded_on_pitch === 0;

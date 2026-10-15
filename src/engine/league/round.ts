@@ -4,7 +4,8 @@
  * match inputs/results, player updates, progression logs, ledger entries and used lineups.
  */
 import { hashInput } from "../common/hash";
-import type { Formation, PlayerProfile, PositionGroup, Tactics } from "../common/types";
+import type { Formation, LineupInstructions, PlayerProfile, PositionGroup, Slot, Tactics } from "../common/types";
+import { addFamiliarity, inferPreferredSlot } from "../lineup/formations";
 import { gateReceiptsCents, resultBonusCents, sponsorshipCents } from "../economy/economy";
 import { resolveLineup, type LineupEntry, type ResolvedLineup, type SquadPlayer } from "../lineup/autopick";
 import { ENGINE_VERSION } from "../match/config";
@@ -20,14 +21,22 @@ export interface LeaguePlayer extends PlayerState {
   name: string;
   position_detail: string | null;
   profile: Partial<PlayerProfile>;
+  preferred_slot?: Slot | null;
+  familiarity?: Partial<Record<Slot, number>> | null;
 }
+
+/** Positional learning carried alongside the progression update (applied by finalize_fixture). */
+export type RoundPlayerUpdate = PlayerUpdate & {
+  position_familiarity?: Partial<Record<Slot, number>>;
+  preferred_slot?: Slot;
+};
 
 export interface LeagueClub {
   id: string;
   name: string;
   reputation: number;
   tactics: Tactics & { formation: Formation };
-  saved_lineup: { formation: string; starters: LineupEntry[]; bench: string[] } | null;
+  saved_lineup: { formation: string; starters: LineupEntry[]; bench: string[]; instructions?: LineupInstructions } | null;
 }
 
 export interface RoundFixture {
@@ -51,7 +60,7 @@ export interface FixtureOutcome {
   input_hash: string;
   result: MatchResult;
   lineups: { club_id: string; resolved: ResolvedLineup }[];
-  player_updates: PlayerUpdate[];
+  player_updates: RoundPlayerUpdate[];
   progression_logs: ProgressionLog[];
   ledger: LedgerEntry[];
 }
@@ -65,12 +74,25 @@ export interface RoundOutcome {
 const toSquad = (p: LeaguePlayer): SquadPlayer => ({
   id: p.id, position_group: p.position_group, position_detail: p.position_detail, current_ovr: p.current_ovr,
   fitness: p.fitness, injured_matches: p.injured_matches, suspension_matches: p.suspension_matches,
+  preferred_slot: p.preferred_slot ?? null, familiarity: p.familiarity ?? null,
 });
 
-const toMatchPlayer = (p: LeaguePlayer, slot?: LineupEntry["slot"]): MatchPlayerInput => ({
+const toMatchPlayer = (p: LeaguePlayer, slot?: LineupEntry["slot"], role?: string | null): MatchPlayerInput => ({
   id: p.id, name: p.name, position_group: p.position_group as PositionGroup, position_detail: p.position_detail,
-  slot, ovr: p.current_ovr, profile: p.profile, fitness: p.fitness, form: p.form, morale: p.morale, sharpness: p.sharpness,
+  slot, role: slot ? role ?? null : undefined, ovr: p.current_ovr, profile: p.profile, fitness: p.fitness, form: p.form,
+  morale: p.morale, sharpness: p.sharpness, preferred_slot: p.preferred_slot ?? null, familiarity: p.familiarity ?? null,
 });
+
+/** Keep only instructions that point at players in the matchday squad (captain must start). */
+function sanitizeInstructions(ins: LineupInstructions | undefined, l: ResolvedLineup): LineupInstructions | undefined {
+  if (!ins) return undefined;
+  const xi = new Set(l.starters.map((s) => s.player_id));
+  const squad = new Set([...xi, ...l.bench]);
+  const out: LineupInstructions = {};
+  if (ins.captain && xi.has(ins.captain)) out.captain = ins.captain;
+  for (const k of ["penalty_taker", "freekick_taker", "corner_taker"] as const) if (ins[k] && squad.has(ins[k]!)) out[k] = ins[k];
+  return Object.keys(out).length ? out : undefined;
+}
 
 export function fixtureSeed(gameId: string, season: number, round: number, fixtureId: string): string {
   return `${gameId}|s${season}|r${round}|${fixtureId}`;
@@ -104,12 +126,13 @@ export function processRound(args: {
     const byId = new Map([...hs, ...as].map((p) => [p.id, p]));
     const team = (club: LeagueClub, l: ResolvedLineup) => ({
       club_id: club.id, name: club.name, formation: l.formation,
+      ...(sanitizeInstructions(club.saved_lineup?.instructions, l) ? { instructions: sanitizeInstructions(club.saved_lineup?.instructions, l) } : {}),
       tactics: {
         mentality: club.tactics.mentality, tempo: club.tactics.tempo, pressing: club.tactics.pressing,
         defensive_line: club.tactics.defensive_line, width: club.tactics.width,
         passing_directness: club.tactics.passing_directness, transitions: club.tactics.transitions,
       },
-      starters: l.starters.map((s) => toMatchPlayer(byId.get(s.player_id)!, s.slot)),
+      starters: l.starters.map((s) => toMatchPlayer(byId.get(s.player_id)!, s.slot, s.role)),
       bench: l.bench.map((id) => toMatchPlayer(byId.get(id)!)),
     });
     const input: MatchInput = { fixture_id: f.id, home: team(home, hl), away: team(away, al) };
@@ -122,7 +145,7 @@ export function processRound(args: {
     const goals = { [home.id]: result.home_goals, [away.id]: result.away_goals };
     const statById = new Map(result.player_stats.map((s) => [s.player_id, s]));
 
-    const updates: PlayerUpdate[] = [];
+    const updates: RoundPlayerUpdate[] = [];
     const logs: ProgressionLog[] = [];
     for (const p of [...hs, ...as]) {
       const st = statById.get(p.id);
@@ -135,7 +158,16 @@ export function processRound(args: {
         injury: st.injury, team_result: res, own_strength: strength[own], opp_strength: strength[opp],
       } : null;
       const { update, log } = progressPlayer(p, perf, { season, round, clubPlayed: true, reputation: clubById.get(own)!.reputation });
-      updates.push(update);
+      const ru: RoundPlayerUpdate = update;
+      if (st && st.minutes > 0 && st.slot) {
+        const fam = addFamiliarity(p.familiarity, st.slot, st.minutes);
+        ru.position_familiarity = fam;
+        if (!p.preferred_slot) {
+          const inferred = inferPreferredSlot(p.position_group as PositionGroup, fam);
+          if (inferred) ru.preferred_slot = inferred;
+        }
+      }
+      updates.push(ru);
       if (log) logs.push(log);
     }
 
@@ -173,7 +205,9 @@ export function processRound(args: {
 }
 
 /** Apply a player update to an in-memory state (used by offline simulations and tests). */
-export function applyUpdate(p: LeaguePlayer, u: PlayerUpdate): void {
+export function applyUpdate(p: LeaguePlayer, u: RoundPlayerUpdate): void {
+  if (u.position_familiarity) p.familiarity = u.position_familiarity;
+  if (u.preferred_slot && !p.preferred_slot) p.preferred_slot = u.preferred_slot;
   Object.assign(p, {
     form: u.form, morale: u.morale, fitness: u.fitness, sharpness: u.sharpness, fatigue: u.fatigue,
     injured_matches: u.injured_matches, injury_type: u.injury_type, suspension_matches: u.suspension_matches,

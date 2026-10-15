@@ -1,6 +1,7 @@
 import type { Formation, PositionGroup, Slot } from "../common/types";
-import { FORMATIONS } from "../common/types";
-import { FORMATION_SLOTS, SLOT_GROUP, slotSuitability } from "./formations";
+import { isFormation } from "../common/types";
+import { FORMATION_SLOTS, SLOT_GROUP, slotFit } from "./formations";
+import { resolveRole } from "./roles";
 
 export interface SquadPlayer {
   id: string;
@@ -10,12 +11,20 @@ export interface SquadPlayer {
   fitness: number;
   injured_matches: number;
   suspension_matches: number;
+  preferred_slot?: Slot | null;
+  familiarity?: Partial<Record<Slot, number>> | null;
+  /** appearances this season (used by the "rotate" auto-pick mode) */
+  apps?: number;
 }
 
 export interface LineupEntry {
   player_id: string;
   slot: Slot;
+  role?: string | null;
 }
+
+/** best: strongest XI; rest: strongly avoid tired players; rotate: favour players with fewer appearances. */
+export type AutoPickMode = "best" | "rest" | "rotate";
 
 export interface ResolvedLineup {
   formation: Formation;
@@ -27,10 +36,12 @@ export interface ResolvedLineup {
 
 export const isAvailable = (p: SquadPlayer): boolean => p.injured_matches === 0 && p.suspension_matches === 0;
 
-const fitnessFactor = (fitness: number): number => 1 - Math.max(0, 85 - fitness) * 0.006;
+const fitnessFactor = (fitness: number, mode: AutoPickMode = "best"): number =>
+  mode === "rest" ? 1 - Math.max(0, 95 - fitness) * 0.02 : 1 - Math.max(0, 85 - fitness) * 0.006;
 
-function slotScore(p: SquadPlayer, slot: Slot): number {
-  return p.current_ovr * slotSuitability(p.position_group, slot, p.position_detail) * fitnessFactor(p.fitness);
+function slotScore(p: SquadPlayer, slot: Slot, mode: AutoPickMode = "best"): number {
+  const rot = mode === "rotate" ? 1 + 0.025 * Math.max(0, 12 - (p.apps ?? 0)) - 0.02 * Math.max(0, (p.apps ?? 0) - 12) : 1;
+  return p.current_ovr * slotFit(p, slot) * fitnessFactor(p.fitness, mode) * rot;
 }
 
 /** Fill order: GK first, then scarce lines. Deterministic tie-break by id. */
@@ -39,11 +50,11 @@ function fillOrder(slots: Slot[]): number[] {
   return slots.map((s, i) => i).sort((a, b) => rank[SLOT_GROUP[slots[a]]] - rank[SLOT_GROUP[slots[b]]] || a - b);
 }
 
-function pickBest(pool: SquadPlayer[], slot: Slot): SquadPlayer | undefined {
+function pickBest(pool: SquadPlayer[], slot: Slot, mode: AutoPickMode = "best"): SquadPlayer | undefined {
   let best: SquadPlayer | undefined;
   let bestScore = -Infinity;
   for (const p of pool) {
-    const s = slotScore(p, slot);
+    const s = slotScore(p, slot, mode);
     if (s > bestScore || (s === bestScore && best && p.id < best.id)) {
       best = p;
       bestScore = s;
@@ -64,15 +75,15 @@ function buildBench(pool: SquadPlayer[], size = 9): string[] {
   return bench.map((p) => p.id);
 }
 
-export function autoPickLineup(squad: SquadPlayer[], formation: Formation = "4-3-3"): ResolvedLineup {
+export function autoPickLineup(squad: SquadPlayer[], formation: Formation = "4-3-3", mode: AutoPickMode = "best"): ResolvedLineup {
   const slots = FORMATION_SLOTS[formation];
   const pool = squad.filter(isAvailable);
   const starters: (LineupEntry | null)[] = slots.map(() => null);
   const warnings: string[] = [];
   for (const idx of fillOrder(slots)) {
-    const best = pickBest(pool, slots[idx]);
+    const best = pickBest(pool, slots[idx], mode);
     if (!best) continue;
-    starters[idx] = { player_id: best.id, slot: slots[idx] };
+    starters[idx] = { player_id: best.id, slot: slots[idx], role: resolveRole(slots[idx], null).id };
     pool.splice(pool.indexOf(best), 1);
   }
   const filled = starters.filter((s): s is LineupEntry => s !== null);
@@ -89,9 +100,8 @@ export function resolveLineup(
   saved: { formation: string; starters: LineupEntry[]; bench: string[] } | null,
   fallbackFormation: Formation = "4-3-3",
 ): ResolvedLineup {
-  if (!saved || !FORMATIONS.includes(saved.formation as Formation)) {
-    const r = autoPickLineup(squad, (saved?.formation as Formation) && FORMATIONS.includes(saved?.formation as Formation)
-      ? (saved!.formation as Formation) : fallbackFormation);
+  if (!saved || !isFormation(saved.formation)) {
+    const r = autoPickLineup(squad, isFormation(fallbackFormation) ? fallbackFormation : "4-3-3");
     r.warnings.unshift(saved ? "invalid_formation_autopicked" : "no_lineup_autopicked");
     return r;
   }
@@ -118,7 +128,7 @@ export function resolveLineup(
       warnings.push(`removed_invalid_slot:${e.player_id}`);
       continue;
     }
-    starters[idx] = { player_id: p.id, slot: slots[idx] };
+    starters[idx] = { player_id: p.id, slot: slots[idx], role: resolveRole(slots[idx], e.role).id };
     used.add(p.id);
     remainingSlots.splice(remainingSlots.indexOf(slots[idx]), 1);
   }
@@ -131,11 +141,11 @@ export function resolveLineup(
     const slot = slots[idx];
     const benchCandidate = benchPref
       .map((id) => byId.get(id)!)
-      .filter((p) => pool.includes(p) && slotSuitability(p.position_group, slot) >= 0.88)
+      .filter((p) => pool.includes(p) && slotFit(p, slot) >= 0.88)
       .sort((a, b) => slotScore(b, slot) - slotScore(a, slot))[0];
     const best = benchCandidate ?? pickBest(pool, slot);
     if (!best) continue;
-    starters[idx] = { player_id: best.id, slot };
+    starters[idx] = { player_id: best.id, slot, role: resolveRole(slot, null).id };
     pool.splice(pool.indexOf(best), 1);
     warnings.push(`autofilled:${slot}:${best.id}`);
   }

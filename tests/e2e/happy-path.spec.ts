@@ -50,11 +50,39 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await a.getByRole("button", { name: "Iniciar liga" }).click();
   await expect(a.getByRole("button", { name: /Jogar jornada 1/ })).toBeVisible();
 
-  // Rui sets lineup + tactics
-  await r.goto(`${gameUrl}/tactics`);
-  await r.getByRole("button", { name: "Auto-escalar" }).click();
+  // Rui builds his lineup in the squad hub: formation, auto-pick, drag & drop, tap-to-place, role, captain, tactics
+  await r.goto(`${gameUrl}/squad`);
+  await r.getByRole("button", { name: /^4-3-3/ }).click();
+  await r.getByRole("option", { name: "3-4-2-1" }).click();
+  await r.getByRole("button", { name: /Auto-escalar/ }).click();
+  await r.getByRole("button", { name: /Melhor onze/ }).click();
+  await expect(r.getByText("Onze sugerido aplicado.")).toBeVisible();
+  // drag the first reserve onto the striker slot (mouse drag → dnd-kit)
+  const reserve = r.getByRole("heading", { name: "Não convocados" }).locator("xpath=ancestor::section[1]").locator("li").first();
+  const striker = r.getByRole("button", { name: /^PL:/ });
+  const reserveName = (await reserve.locator("p").first().innerText()).replace(/^\d+\s*/, "").trim();
+  await reserve.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const rb = await reserve.boundingBox(), sb = await striker.boundingBox();
+  if (rb && sb) {
+    await r.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
+    await r.mouse.down();
+    await r.mouse.move(rb.x + rb.width / 2 + 20, rb.y + rb.height / 2 + 10, { steps: 4 });
+    await r.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2, { steps: 12 });
+    await r.mouse.up();
+  }
+  await expect(r.getByRole("button", { name: `PL: ${reserveName}` })).toBeVisible();
+  // tap-to-place: select the GK token, open its panel, then pick a striker role via the ST token
+  await striker.click();
+  await r.getByRole("button", { name: /Falso 9/ }).click();
+  await r.getByRole("button", { name: "Capitão" }).click();
+  await r.screenshot({ path: "test-results/squad-hub-desktop.png", fullPage: true });
+  await r.getByRole("tab", { name: "Instruções" }).click();
   await r.getByRole("radio", { name: "Alta" }).first().click(); // pressing high
-  await r.getByRole("button", { name: "Guardar escalação e tática" }).click();
+  await r.getByRole("tab", { name: "Lista" }).click();
+  await expect(r.getByRole("columnheader", { name: /OVR/ })).toBeVisible();
+  await r.getByRole("tab", { name: "Profundidade" }).click();
+  await expect(r.getByText("Profundidade por posição")).toBeVisible();
+  await r.getByRole("button", { name: "Guardar escalação" }).click();
   await expect(r.getByText("Escalação e tática guardadas.")).toBeVisible();
 
   // Ana processes matchday 1

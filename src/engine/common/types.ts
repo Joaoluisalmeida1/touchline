@@ -12,10 +12,26 @@ export interface PlayerProfile {
   source?: "position_default" | "provider_style" | "synthetic";
 }
 
-export type Formation = "4-3-3" | "4-2-3-1" | "4-4-2" | "4-1-4-1" | "3-5-2" | "5-3-2";
-export const FORMATIONS: readonly Formation[] = ["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "3-5-2", "5-3-2"];
+/** All supported formations. Layouts (slots + pitch coordinates) live in lineup/formations.ts. */
+export const FORMATIONS = [
+  "4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "3-5-2", "5-3-2",
+  "4-1-2-1-2", "4-2-2-2", "4-3-2-1", "4-4-1-1", "4-5-1", "4-2-4",
+  "3-4-3", "3-4-2-1", "3-4-1-2", "5-4-1", "5-2-3",
+] as const;
+export type Formation = (typeof FORMATIONS)[number];
+export const isFormation = (f: unknown): f is Formation => typeof f === "string" && (FORMATIONS as readonly string[]).includes(f);
 
-export type Slot = "GK" | "LB" | "CB" | "RB" | "LWB" | "RWB" | "DM" | "CM" | "AM" | "LM" | "RM" | "LW" | "RW" | "ST";
+export const SLOTS = ["GK", "LB", "CB", "RB", "LWB", "RWB", "DM", "CM", "AM", "LM", "RM", "LW", "RW", "ST"] as const;
+export type Slot = (typeof SLOTS)[number];
+export const isSlot = (s: unknown): s is Slot => typeof s === "string" && (SLOTS as readonly string[]).includes(s);
+
+/** Per-match manager instructions attached to a lineup. Player ids must belong to the XI (captain) or matchday squad. */
+export interface LineupInstructions {
+  captain?: string | null;
+  penalty_taker?: string | null;
+  freekick_taker?: string | null;
+  corner_taker?: string | null;
+}
 
 export interface Tactics {
   mentality: "defensive" | "balanced" | "attacking";

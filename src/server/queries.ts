@@ -5,7 +5,8 @@ import { withUser } from "./db";
 
 const PLAYER_COLS = `p.id, p.club_id, p.name_snapshot, p.position_group, p.position_detail, p.age, p.age_known, p.initial_ovr,
   p.season_start_ovr, p.current_ovr, p.potential_band, p.form, p.morale, p.fitness, p.sharpness, p.fatigue, p.injured_matches,
-  p.injury_type, p.suspension_matches, p.market_value_cents, p.wage_cents, p.contract_end_season, p.season_stats_json, p.profile_json`;
+  p.injury_type, p.suspension_matches, p.market_value_cents, p.wage_cents, p.contract_end_season, p.season_stats_json, p.profile_json,
+  p.preferred_slot, p.preferred_slot_season, p.position_familiarity, p.shirt_number`;
 
 export interface PlayerRow {
   id: string; club_id: string | null; name_snapshot: string; position_group: "GK" | "DEF" | "MID" | "ATT"; position_detail: string | null;
@@ -14,6 +15,8 @@ export interface PlayerRow {
   suspension_matches: number; market_value_cents: string; wage_cents: string; contract_end_season: number;
   season_stats_json: { apps?: number; goals?: number; assists?: number; minutes?: number; rating_sum?: number; rated?: number } | null;
   profile_json: Record<string, unknown>;
+  preferred_slot: string | null; preferred_slot_season: number | null;
+  position_familiarity: Record<string, number> | null; shirt_number: number | null;
 }
 
 export async function listMyGames(userId: string) {
@@ -70,9 +73,29 @@ export async function getSquad(userId: string, gameId: string, clubId: string, p
 export async function getTacticsAndLineup(userId: string, clubId: string) {
   return withUser(userId, async (c) => {
     const t = await c.query(`select * from tactics where club_id = $1`, [clubId]);
-    const l = await c.query(`select formation, starters_json, bench_json, warnings_json, updated_at from lineups where club_id = $1 and fixture_id is null`, [clubId]);
-    return { tactics: t.rows[0] ?? null, lineup: l.rows[0] ?? null };
+    const l = await c.query(`select formation, starters_json, bench_json, instructions_json, warnings_json, updated_at from lineups where club_id = $1 and fixture_id is null`, [clubId]);
+    const pr = await c.query(`select id, name, payload, updated_at from tactic_presets where club_id = $1 and archived_at is null order by name`, [clubId]);
+    return { tactics: t.rows[0] ?? null, lineup: l.rows[0] ?? null, presets: pr.rows as { id: string; name: string; payload: Record<string, unknown>; updated_at: string }[] };
   });
+}
+
+/** Last N match ratings per player of a club (most recent first), for form sparklines. */
+export async function getRecentRatings(userId: string, clubId: string, n = 5) {
+  return withUser(userId, async (c) => {
+    const r = await c.query<{ player_id: string; ratings: (number | null)[] }>(
+      `select game_player_id as player_id, array_agg(rating order by kickoff desc) as ratings from (
+         select s.game_player_id, s.rating::float as rating, f.kickoff_at as kickoff,
+                row_number() over (partition by s.game_player_id order by f.kickoff_at desc) rn
+           from match_player_stats s join fixtures f on f.id = s.fixture_id
+          where s.club_id = $1 and s.minutes > 0) x
+        where rn <= $2 group by game_player_id`, [clubId, n]);
+    return Object.fromEntries(r.rows.map((x) => [x.player_id, x.ratings])) as Record<string, (number | null)[]>;
+  });
+}
+
+export async function getClubColors(userId: string, clubId: string) {
+  return withUser(userId, async (c) => (await c.query<{ name_snapshot: string; short_name: string; primary_color: string; secondary_color: string }>(
+    `select name_snapshot, short_name, primary_color, secondary_color from game_clubs where id = $1`, [clubId])).rows[0] ?? null);
 }
 
 export async function getStandings(userId: string, gameId: string, seasonNumber?: number) {

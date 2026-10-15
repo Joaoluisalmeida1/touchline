@@ -6,7 +6,7 @@
  * A crash mid-round leaves completed fixtures intact; the next call resumes the same round.
  */
 import type { Pool } from "pg";
-import type { Formation, Tactics } from "../../engine/common/types";
+import type { Formation, LineupInstructions, Tactics } from "../../engine/common/types";
 import { ENGINE_VERSION } from "../../engine/match/config";
 import { processRound, seasonEnd, type LeagueClub, type LeaguePlayer, type StandingRow } from "../../engine/league/round";
 import type { LineupEntry } from "../../engine/lineup/autopick";
@@ -27,7 +27,7 @@ export async function loadLeagueState(pool: Pool, gameId: string) {
   return asService(pool, async (c) => {
     const clubs = await c.query(
       `select gc.id, gc.name_snapshot, gc.reputation, t.formation, t.mentality, t.tempo, t.pressing, t.defensive_line, t.width,
-              t.passing_directness, t.transitions, l.formation as l_formation, l.starters_json, l.bench_json
+              t.passing_directness, t.transitions, l.formation as l_formation, l.starters_json, l.bench_json, l.instructions_json
          from public.game_clubs gc
          left join public.tactics t on t.club_id = gc.id
          left join public.lineups l on l.club_id = gc.id and l.fixture_id is null
@@ -35,7 +35,8 @@ export async function loadLeagueState(pool: Pool, gameId: string) {
     const players = await c.query(
       `select id, version, club_id, name_snapshot, position_group, position_detail, age, current_ovr, potential_cap, potential_band,
               hidden_development_rate, form, morale, fitness, sharpness, fatigue, injured_matches, injury_type, suspension_matches,
-              yellow_accumulation, development_xp, market_value_cents, wage_cents, contract_end_season, season_stats_json, profile_json
+              yellow_accumulation, development_xp, market_value_cents, wage_cents, contract_end_season, season_stats_json, profile_json,
+              preferred_slot, position_familiarity
          from public.game_players where game_id = $1 and club_id is not null order by id`, [gameId]);
     const leagueClubs: LeagueClub[] = clubs.rows.map((r) => ({
       id: r.id, name: r.name_snapshot, reputation: r.reputation,
@@ -44,7 +45,10 @@ export async function loadLeagueState(pool: Pool, gameId: string) {
         pressing: r.pressing ?? "medium", defensive_line: r.defensive_line ?? "medium", width: r.width ?? "balanced",
         passing_directness: r.passing_directness ?? "mixed", transitions: r.transitions ?? "balanced",
       } as Tactics & { formation: Formation },
-      saved_lineup: r.starters_json ? { formation: r.l_formation, starters: r.starters_json as LineupEntry[], bench: (r.bench_json ?? []) as string[] } : null,
+      saved_lineup: r.starters_json ? {
+        formation: r.l_formation, starters: r.starters_json as LineupEntry[], bench: (r.bench_json ?? []) as string[],
+        instructions: (r.instructions_json ?? {}) as LineupInstructions,
+      } : null,
     }));
     const leaguePlayers: LeaguePlayer[] = players.rows.map((r) => ({
       id: r.id, version: r.version, club_id: r.club_id, name: r.name_snapshot, position_group: r.position_group,
@@ -56,6 +60,7 @@ export async function loadLeagueState(pool: Pool, gameId: string) {
       market_value_cents: Number(r.market_value_cents), wage_cents: Number(r.wage_cents), contract_end_season: r.contract_end_season,
       season_stats: r.season_stats_json ?? null, value_anchor_ratio: Number(r.profile_json?.value_anchor_ratio ?? 1),
       physical: Number(r.profile_json?.physical ?? 60),
+      preferred_slot: r.preferred_slot ?? null, familiarity: r.position_familiarity ?? {},
     }));
     return { clubs: leagueClubs, players: leaguePlayers };
   });

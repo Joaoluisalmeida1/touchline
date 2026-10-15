@@ -3,7 +3,7 @@
  * scripts/sim-calibration (see docs/game-balance.md). They are hypotheses, not empirical truth.
  * Changing any value that alters outcomes MUST bump ENGINE_VERSION.
  */
-export const ENGINE_VERSION = "match-v1.0.0";
+export const ENGINE_VERSION = "match-v1.1.0";
 
 export const ENGINE_CONFIG = {
   /** mean seconds per possession before style multipliers */
@@ -49,6 +49,14 @@ export const ENGINE_CONFIG = {
   // ---- form / morale influence (bounded, small) ----
   formEffect: 0.03, // +-3% at form +-3
   moraleEffect: 0.015,
+  // ---- formation structure (v1.1) ----
+  /** rating points per unit of line weight above/below the 4-3-3 reference (def/mid/att lines) */
+  lineEffect: { def: 1.4, mid: 1.15, att: 1.55 },
+  /** header chance weight multiplier per wide slot above/below reference */
+  widthHeaderEffect: 0.1,
+  // ---- captain (v1.1) ----
+  captainBase: 0.25,
+  captainPerPoint: 0.015,
 } as const;
 
 export type EngineConfig = typeof ENGINE_CONFIG;
