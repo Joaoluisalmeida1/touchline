@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  integration:
+    name: Integration tests (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      # scripts/db/local-reset.sh + tests/support/db.ts create one fresh database per suite on this server
+      LOCAL_PG_URL: postgres://postgres:postgres@localhost:5432
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+
+  build-e2e:
+    name: Build + typecheck + E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      LOCAL_PG_URL: postgres://postgres:postgres@localhost:5432
+      SUPABASE_DB_URL: postgres://postgres:postgres@localhost:5432/touchline_e2e
+      APP_BASE_URL: http://localhost:3000
+      # Local dev-auth adapter (no Supabase project in CI). `next start` runs with NODE_ENV=production,
+      # so the explicit opt-in is required; serverEnv() still refuses dev auth on Vercel.
+      AUTH_MODE: dev
+      ALLOW_DEV_AUTH_IN_LOCAL_PROD: "1"
+      # CI-only throwaway values. They double as sentinels for the client-bundle leak check below.
+      DEV_AUTH_SECRET: ci-only-dev-auth-secret-0123456789abcdef
+      CRON_SECRET: ci-only-cron-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      - name: Build
+        run: npm run build
+
+      # After the build so next-env.d.ts and .next/types exist (they are gitignored)
+      - name: Typecheck (incl. scripts and tests)
+        run: npm run typecheck
+
+      - name: Server secrets must not reach the client bundle
+        run: |
+          leaked=0
+          for name in DEV_AUTH_SECRET CRON_SECRET SUPABASE_DB_URL; do
+            if grep -rqF "${!name}" .next/static; then
+              echo "::error::$name value found in .next/static"
+              leaked=1
+            fi
+          done
+          exit $leaked
+
+      - name: Prepare database (shim + migrations + synthetic seed)
+        run: |
+          scripts/db/local-reset.sh touchline_e2e
+          npm run seed:synthetic
+
+      - name: Start app
+        run: |
+          nohup npm run start > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/api/health && exit 0
+            sleep 1
+          done
+          echo "::error::app did not become healthy"
+          cat server.log
+          exit 1
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        run: npm run test:e2e
+
+      - name: Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+            server.log
+          retention-days: 7

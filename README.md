@@ -1,5 +1,7 @@
 # Touchline (nome provisório)
 
+[![CI](https://github.com/Joaoluisalmeida1/touchline/actions/workflows/ci.yml/badge.svg)](https://github.com/Joaoluisalmeida1/touchline/actions/workflows/ci.yml)
+
 Jogo de gestão de futebol multiplayer assíncrono para browser: ligas privadas entre amigos, plantéis iniciais derivados do PlayerElo (Elo → OVR), jornadas simuladas lance a lance no servidor, mercado de transferências atómico e evolução independente por liga.
 
 > O nome está em `src/lib/brand.ts` / `NEXT_PUBLIC_APP_NAME`.
@@ -15,10 +17,13 @@ Jogo de gestão de futebol multiplayer assíncrono para browser: ligas privadas 
 | Progressão (forma/fitness/moral/XP/OVR) + economia | ✅ simulação de várias épocas |
 | Jornadas idempotentes (lease, exactly-once), fim de época | ✅ incl. processadores concorrentes |
 | Mercado (IA, propostas entre managers, reservas, concorrência) | ✅ |
-| UI pt-PT (dashboard, liga, plantel, tática 2D, jogos, replay, tabela, mercado, finanças, definições, admin) | ✅ E2E Playwright local |
+| UI pt-PT (dashboard, liga, plantel, tática 2D, jogos, replay, tabela, mercado, finanças, definições, admin) | ✅ E2E Playwright local e no CI |
+| CI (GitHub Actions) | ✅ lint, unitários, integração (Postgres 17), build, typecheck, verificação de segredos no bundle, E2E — em cada PR |
 | Deploy Vercel/Supabase | ⏳ instruções prontas (`docs/deployment.md`); não houve deploy (sem contas) |
 
 ## Início rápido (local, sem chaves)
+
+Requisitos: Node 24 (ver `.nvmrc`; `nvm use`), Postgres 15+ com `psql`, e bash (Git Bash no Windows) para `scripts/db/local-reset.sh`.
 
 ```bash
 npm install

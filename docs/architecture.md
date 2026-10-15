@@ -14,7 +14,7 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 
 | Pasta | Conteúdo |
 |---|---|
-| `supabase/migrations` | Schema, RLS, comandos SQL (`0001`–`0008`) |
+| `supabase/migrations` | Schema, RLS, comandos SQL (`0001`–`0009`) |
 | `supabase/seed.sql` | Catálogo + snapshot **fictícios** para dev |
 | `supabase/local/00_supabase_shim.sql` | Só testes: papéis + `auth.uid()` num Postgres simples |
 | `src/engine/common` | RNG determinístico (xmur3+sfc32), hash canónico, tipos |
