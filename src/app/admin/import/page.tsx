@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { Badge, Card, CardTitle } from "@/components/ui";
+import { ActionForm } from "@/components/action-form";
+import { seedSyntheticAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
 import { withService } from "@/server/db";
 import { getProfile } from "@/server/queries";
@@ -23,6 +25,11 @@ export default async function AdminImport() {
       <SiteHeader user={user} />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
         <h1 className="text-3xl font-black">Dados e importação</h1>
+        <Card>
+          <CardTitle>Dataset de desenvolvimento</CardTitle>
+          <p className="mb-3 text-sm text-muted">Cria duas ligas 100% fictícias (26 clubes, ~620 jogadores) para testar o jogo sem chave PlayerElo.</p>
+          <ActionForm action={seedSyntheticAction} submitLabel="Carregar dados fictícios" pendingLabel="A gerar…" />
+        </Card>
         <Card>
           <CardTitle>Como importar (CLI)</CardTitle>
           <pre className="overflow-x-auto rounded-lg bg-bg p-3 text-xs leading-relaxed">{`npm run playerelo:discover -- --anchors      # ligas + âncoras da escala (≈12 pedidos)

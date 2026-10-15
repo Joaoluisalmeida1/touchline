@@ -1,11 +1,13 @@
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabasePublicConfig } from "./config";
 
 /** Supabase client bound to the request cookies (publishable key only — never the secret key). */
 export async function supabaseServer() {
   const store = await cookies();
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const { url, key } = supabasePublicConfig();
+  return createServerClient(url, key, {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (list) => {

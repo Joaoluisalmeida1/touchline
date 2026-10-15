@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { supabasePublicConfig } from "../lib/supabase/config";
+import { resolveDbUrl } from "./pg-config";
 
 /** Server-only environment. Secrets never use the NEXT_PUBLIC_ prefix. */
 const ServerEnv = z.object({
-  SUPABASE_DB_URL: z.string().min(1, "SUPABASE_DB_URL is required"),
+  SUPABASE_DB_URL: z.string({ message: "SUPABASE_DB_URL (or POSTGRES_URL) is required" }).min(1),
   NEXT_PUBLIC_SUPABASE_URL: z.string().optional(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
   SUPABASE_SECRET_KEY: z.string().optional(),
@@ -16,7 +18,13 @@ export type ServerEnvT = z.infer<typeof ServerEnv>;
 let cached: ServerEnvT | null = null;
 export function serverEnv(): ServerEnvT {
   if (cached) return cached;
-  const parsed = ServerEnv.parse(process.env);
+  const parsed = ServerEnv.parse({
+    ...process.env,
+    SUPABASE_DB_URL: resolveDbUrl(),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabasePublicConfig().key || undefined,
+    APP_BASE_URL: process.env.APP_BASE_URL
+      ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined),
+  });
   if (parsed.AUTH_MODE === "dev") {
     // The dev auth adapter is for local testing only and must never run in a deployed environment.
     if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.NODE_ENV === "production" && !process.env.ALLOW_DEV_AUTH_IN_LOCAL_PROD) {

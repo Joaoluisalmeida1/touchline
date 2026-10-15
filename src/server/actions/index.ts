@@ -248,3 +248,30 @@ export async function markNotificationsReadAction(form: FormData): Promise<void>
   await withUser(user.id, (c) => c.query(`select public.mark_notifications_read(null)`));
   revalidatePath(`/g/${gameId}`, "layout");
 }
+
+/* ------------------------------- admin ------------------------------- */
+/** Platform admin only: load the FICTIONAL dev dataset (two synthetic leagues + finalized snapshot). */
+export async function seedSyntheticAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  void form;
+  try {
+    const isAdmin = await withUser(user.id, async (c) =>
+      (await c.query(`select is_admin from profiles where id = $1`, [user.id])).rows[0]?.is_admin === true);
+    if (!isAdmin) return { error: "Só administradores." };
+    const pool = getPool();
+    const existing = await pool.query(`select id from dataset_snapshots where is_synthetic and status = 'finalized' limit 1`);
+    if (existing.rowCount) return { ok: true, message: "O dataset fictício já existe — nada a fazer." };
+    const { seedSyntheticLeague, SYNTHETIC_ANCHORS } = await import("../../integrations/catalog/synthetic");
+    const { buildSnapshot } = await import("../../integrations/catalog/snapshot");
+    await seedSyntheticLeague(pool, { externalId: "liga-atlantica", name: "Liga Atlântica (fictícia)", clubs: 18 });
+    await seedSyntheticLeague(pool, { externalId: "taca-norte", name: "Divisão Norte (fictícia)", clubs: 8, strength: [1250, 1450] });
+    const r = await buildSnapshot(pool, {
+      provider: "synthetic", leagueExternalIds: ["liga-atlantica", "taca-norte"], label: "DEV — Dados fictícios",
+      anchors: SYNTHETIC_ANCHORS, asOf: new Date("2026-08-01T00:00:00Z"),
+    });
+    revalidatePath("/admin/import");
+    return { ok: true, message: `Dataset fictício criado: ${r.report.clubs_in_snapshot} clubes, ${r.report.players_in_snapshot} jogadores.` };
+  } catch (e) {
+    return fail(e);
+  }
+}

@@ -2,6 +2,7 @@
 import { config } from "dotenv";
 import { Pool } from "pg";
 import { PlayerEloClient } from "../../src/integrations/playerelo/client";
+import { pgPoolConfig, resolveDbUrl } from "../../src/server/pg-config";
 
 config({ path: ".env.local" });
 config();
@@ -16,9 +17,9 @@ export const flag = (name: string) => process.argv.includes(`--${name}`);
 export const list = (name: string) => (arg(name) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 export function dbPool(): Pool {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) throw new Error("SUPABASE_DB_URL is not set (see .env.example)");
-  return new Pool({ connectionString: url, max: 3, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: false } });
+  const url = resolveDbUrl();
+  if (!url) throw new Error("SUPABASE_DB_URL (or POSTGRES_URL) is not set (see .env.example)");
+  return new Pool(pgPoolConfig(url, 3));
 }
 
 export function playerEloClient(): PlayerEloClient {
