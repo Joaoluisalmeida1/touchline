@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -47,8 +47,8 @@ jobs:
       # scripts/db/local-reset.sh + tests/support/db.ts create one fresh database per suite on this server
       LOCAL_PG_URL: postgres://postgres:postgres@localhost:5432
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -60,7 +60,7 @@ jobs:
         run: node scripts/ci/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         if: always() && hashFiles('coverage/coverage-summary.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
@@ -90,14 +90,14 @@ jobs:
       DEV_AUTH_SECRET: ci-only-dev-auth-secret-0123456789abcdef
       CRON_SECRET: ci-only-cron-secret-0123456789abcdef
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .next/cache
           key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
@@ -146,7 +146,7 @@ jobs:
 
       - name: Upload E2E artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-report
           path: |
