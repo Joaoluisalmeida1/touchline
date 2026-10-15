@@ -1,3 +1,4 @@
+import { Crown, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { CopyInvite } from "@/components/copy-invite";
 import { Badge, Card, CardTitle, Field, inputCls } from "@/components/ui";
@@ -17,38 +18,43 @@ export default async function Settings({ params, searchParams }: { params: Promi
   const base = serverEnv().APP_BASE_URL;
   const s = game.settings_json ?? {};
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-5 lg:grid-cols-2">
       {game.is_owner && (
-        <Card className="lg:col-span-2">
-          <CardTitle>Convite</CardTitle>
+        <Card glow={!!invite} className="lg:col-span-2">
+          <CardTitle icon={<KeyRound />}>Convite</CardTitle>
           {invite && /^[A-Z2-9]{16}$/.test(invite) ? <CopyInvite code={invite} link={`${base}/join/${invite}`} /> : (
             <p className="text-sm text-muted">Por segurança só guardamos o hash do convite. Gera um novo para o voltares a ver (o anterior deixa de funcionar).</p>
           )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <RotateInvite gameId={gameId} base={base} />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ActionForm action={rotateInviteAction} hidden={{ gameId, base }} submitLabel="Gerar novo convite" variant="secondary" inline />
             <ActionForm action={revokeInviteAction} hidden={{ gameId }} submitLabel="Revogar convite" variant="danger" inline confirm="Revogar? Ninguém poderá entrar até gerares um novo." />
           </div>
         </Card>
       )}
       <Card>
-        <CardTitle>Managers ({members.length}/{game.max_managers})</CardTitle>
+        <CardTitle icon={<Users />} action={<span className="font-display text-sm font-bold text-faint">{members.length}/{game.max_managers}</span>}>Managers</CardTitle>
+        <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-accent" style={{ width: `${(members.length / Math.max(1, game.max_managers)) * 100}%` }} /></div>
         <ul className="space-y-2 text-sm">
           {members.map((m) => (
-            <li key={m.user_id} className="flex items-center justify-between">
-              <span>{m.display_name} {m.role === "owner" && <Badge tone="info">Criador</Badge>}</span>
-              <span className="text-muted">{m.club_name ?? "sem clube"}</span>
+            <li key={m.user_id} className="flex items-center gap-3 rounded-xl border border-line bg-bg/40 px-3 py-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-3 font-display text-sm font-bold ring-1 ring-line-strong">{String(m.display_name ?? "?").slice(0, 2).toUpperCase()}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 truncate font-semibold">{m.display_name}{m.role === "owner" && <Crown className="size-3.5 text-gold" aria-label="Criador" />}</span>
+                <span className="block truncate text-xs text-muted">{m.club_name ?? "sem clube"}</span>
+              </span>
+              {m.role === "owner" && <Badge tone="info">Criador</Badge>}
             </li>
           ))}
         </ul>
         {!game.is_owner && (
-          <div className="mt-4">
+          <div className="mt-5 border-t border-line pt-4">
             <ActionForm action={leaveGameAction} hidden={{ gameId }} submitLabel="Sair da liga" variant="danger" confirm="Sair da liga? O teu clube passa para a IA." />
           </div>
         )}
       </Card>
       {game.is_owner ? (
         <Card>
-          <CardTitle>Regras e calendário</CardTitle>
+          <CardTitle icon={<SlidersHorizontal />}>Regras e calendário</CardTitle>
           <ActionForm action={updateSettingsAction} hidden={{ gameId }} submitLabel="Guardar definições">
             <Field label="Nome"><input name="name" defaultValue={game.name} className={inputCls} /></Field>
             <Field label="Avanço de jornadas" hint="Plano Hobby da Vercel: cron no máximo 1×/dia e com precisão de ±59 min. Modo manual funciona sempre.">
@@ -63,20 +69,17 @@ export default async function Settings({ params, searchParams }: { params: Promi
         </Card>
       ) : (
         <Card>
-          <CardTitle>Regras</CardTitle>
-          <ul className="space-y-1 text-sm text-muted">
-            <li>Vitória {s.points_win ?? 3} pts · Empate {s.points_draw ?? 1} pt</li>
-            <li>Plantel entre {s.min_squad ?? 16} e {s.max_squad ?? 32} jogadores</li>
-            <li>Avanço: {game.tick_mode === "daily" ? "diário" : "manual pelo criador"}</li>
-          </ul>
+          <CardTitle icon={<ScrollText />}>Regras</CardTitle>
+          <dl className="grid grid-cols-2 gap-2.5 text-sm">
+            {[["Vitória", `${s.points_win ?? 3} pontos`], ["Empate", `${s.points_draw ?? 1} ponto`], ["Plantel", `${s.min_squad ?? 16}–${s.max_squad ?? 32} jogadores`], ["Avanço", game.tick_mode === "daily" ? "Diário" : "Manual (criador)"]].map(([k, v]) => (
+              <div key={k} className="rounded-xl border border-line bg-bg/40 p-3">
+                <dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{k}</dt>
+                <dd className="mt-1 font-display text-lg font-bold">{v}</dd>
+              </div>
+            ))}
+          </dl>
         </Card>
       )}
     </div>
-  );
-}
-
-function RotateInvite({ gameId, base }: { gameId: string; base: string }) {
-  return (
-    <ActionForm action={rotateInviteAction} hidden={{ gameId, base }} submitLabel="Gerar novo convite" variant="secondary" inline />
   );
 }

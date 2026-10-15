@@ -1,4 +1,5 @@
 "use client";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FORMATIONS, type Formation } from "@/engine/common/types";
 import { SLOT_GROUP, slotCoordinates } from "@/engine/lineup/formations";
@@ -9,7 +10,7 @@ const GROUPS: { label: string; match: (f: Formation) => boolean }[] = [
   { label: "Linha de 3", match: (f) => f.startsWith("3") },
   { label: "Linha de 5", match: (f) => f.startsWith("5") },
 ];
-const DOT: Record<string, string> = { GK: "#fbbf24", DEF: "#38bdf8", MID: "#34d399", ATT: "#fb7185" };
+const DOT: Record<string, string> = { GK: "#ffd166", DEF: "#7dd3fc", MID: "#d4ff3a", ATT: "#fb7185" };
 
 export function FormationThumb({ f, size = 56 }: { f: Formation; size?: number }) {
   return (
@@ -38,13 +39,13 @@ export function FormationPicker({ value, onChange, disabled }: { value: Formatio
   return (
     <div className="relative" ref={ref}>
       <button type="button" disabled={disabled} onClick={() => setOpen((o) => !o)} aria-haspopup="listbox" aria-expanded={open}
-        className="flex min-h-10 items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 text-sm font-bold hover:border-faint disabled:opacity-50">
+        className="flex min-h-10 items-center gap-2 rounded-xl border border-line-strong bg-surface-2 px-3 font-display text-lg font-bold transition hover:border-faint disabled:opacity-50">
         <FormationThumb f={value} size={18} />
         <span className="tabular">{value}</span>
-        <span className="text-faint">▾</span>
+        <ChevronDown className="size-4 text-faint" />
       </button>
       {open && (
-        <div role="listbox" aria-label="Formação" className="absolute left-0 z-40 mt-2 w-[min(92vw,560px)] rounded-xl border border-line bg-surface p-3 shadow-2xl">
+        <div role="listbox" aria-label="Formação" className="absolute left-0 z-40 mt-2 w-[min(92vw,560px)] rounded-2xl border border-line-strong bg-surface p-3 shadow-2xl">
           {GROUPS.map((g) => (
             <div key={g.label} className="mb-2 last:mb-0">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">{g.label}</p>
@@ -53,7 +54,7 @@ export function FormationPicker({ value, onChange, disabled }: { value: Formatio
                   <button key={f} type="button" role="option" aria-selected={f === value}
                     onClick={() => { onChange(f); setOpen(false); }}
                     className={cn("flex flex-col items-center gap-1 rounded-lg border p-1.5 text-[11px] font-bold tabular transition",
-                      f === value ? "border-accent bg-accent/10 text-ink" : "border-line text-muted hover:border-faint hover:text-ink")}>
+                      f === value ? "border-accent/70 bg-accent/10 text-ink" : "border-line text-muted hover:border-line-strong hover:bg-surface-2 hover:text-ink")}>
                     <FormationThumb f={f} size={40} />
                     {f}
                   </button>

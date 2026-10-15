@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { LineupInstructions, Slot } from "@/engine/common/types";
 import { PREFERRABLE_SLOTS, SLOT_LABEL, SLOT_NAME } from "@/engine/lineup/formations";
@@ -34,7 +35,7 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
       <div className="flex items-start gap-3">
         <PlayerAvatar id={p.id} primary={look.primary} secondary={look.secondary} size={64} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold leading-6">{p.name}</p>
+          <p className="truncate font-display text-2xl font-extrabold uppercase leading-7 tracking-tight">{p.name}</p>
           <p className="text-xs text-muted">
             {p.preferred_slot ? SLOT_NAME[p.preferred_slot] : { GK: "Guarda-redes", DEF: "Defesa", MID: "Médio", ATT: "Avançado" }[p.group]}
             {p.age !== null ? ` · ${p.age} anos` : ""} · Pot. {p.potential_band}
@@ -50,13 +51,13 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
           <OvrBadge ovr={p.ovr} size="lg" />
           {p.ovr_delta !== 0 && <span className={cn("text-xs font-bold", p.ovr_delta > 0 ? "text-accent" : "text-danger")}>{p.ovr_delta > 0 ? `+${p.ovr_delta}` : p.ovr_delta} época</span>}
         </div>
-        <button type="button" onClick={onClose} className="-mr-1 -mt-1 rounded-md p-1 text-muted hover:text-ink" aria-label="Fechar">✕</button>
+        <button type="button" onClick={onClose} className="-mr-1 -mt-1 rounded-lg p-1.5 text-muted transition hover:bg-surface-2 hover:text-ink" aria-label="Fechar"><X className="size-4" /></button>
       </div>
 
       {slot && slotIndex !== null && (
-        <div className="rounded-xl border border-line bg-bg/50 p-3">
+        <div className="rounded-2xl border border-line bg-bg/50 p-3">
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-semibold">{SLOT_NAME[slot]}</span>
+            <span className="font-display text-base font-bold uppercase">{SLOT_NAME[slot]}</span>
             <span className={cn("font-bold tabular", fitText(fitOf(p, slot)))}>
               {Math.round(fitOf(p, slot) * 100)}% · rende {effOf(p, slot)}
             </span>
@@ -65,7 +66,7 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
           <div className="grid gap-1.5">
             {rolesForSlot(slot).map((r) => (
               <button key={r.id} type="button" disabled={locked} onClick={() => onRole(slotIndex, r.id)}
-                className={cn("rounded-lg border px-2.5 py-1.5 text-left transition", role === r.id ? "border-accent bg-accent/10" : "border-line hover:border-faint")}>
+                className={cn("rounded-xl border px-3 py-2 text-left transition", role === r.id ? "border-accent/70 bg-accent/10 shadow-[0_0_0_3px_rgb(212_255_58/.1)]" : "border-line hover:border-line-strong hover:bg-surface-2")}>
                 <span className="text-sm font-semibold">{r.label}</span>
                 <span className="block text-[11px] leading-4 text-muted">{r.description}</span>
               </button>
@@ -161,7 +162,7 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
         </div>
       )}
 
-      <Link href={`/g/${gameId}/players/${p.id}`} className="block text-center text-sm font-semibold text-info hover:underline">Ver perfil completo →</Link>
+      <Link href={`/g/${gameId}/players/${p.id}`} className="block rounded-xl border border-line py-2.5 text-center text-sm font-bold text-ink transition hover:border-accent hover:text-accent">Ver perfil completo →</Link>
     </div>
   );
 }

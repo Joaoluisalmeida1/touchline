@@ -57,12 +57,12 @@ export function ListView({ squad, st, look, onOpen, selected }: {
 
   return (
     <div className="space-y-4">
-      <Card className="p-0">
+      <Card className="overflow-hidden p-0 sm:p-0">
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3 text-sm">
           {([["", "Todos"], ["GK", "GR"], ["DEF", "Defesas"], ["MID", "Médios"], ["ATT", "Avançados"]] as const).map(([k, l]) => (
-            <button key={k} type="button" onClick={() => setGroup(k)} className={cn("rounded-full px-3 py-1", group === k ? "bg-surface-2 font-semibold text-ink" : "text-muted hover:text-ink")}>{l}</button>
+            <button key={k} type="button" onClick={() => setGroup(k)} className={cn("rounded-lg px-3 py-1.5 text-xs font-bold transition", group === k ? "bg-accent text-accent-ink" : "text-muted hover:bg-surface-2 hover:text-ink")}>{l}</button>
           ))}
-          <input className={cn(inputCls, "ml-auto min-h-8 w-44")} placeholder="Procurar…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Procurar jogador" />
+          <input className={cn(inputCls, "ml-auto min-h-9 w-44")} placeholder="Procurar…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Procurar jogador" />
           <div className="relative">
             <button type="button" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink" onClick={() => setShowCols((s) => !s)} aria-expanded={showCols}>Colunas ▾</button>
             {showCols && (
@@ -78,7 +78,7 @@ export function ListView({ squad, st, look, onOpen, selected }: {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
-            <thead className="text-left text-[11px] uppercase tracking-wide text-faint">
+            <thead className="border-b border-line text-left text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
               <tr>
                 <th className="w-8 p-2"><span className="sr-only">Comparar</span></th>
                 <th className="p-2">Jogador</th>
@@ -89,14 +89,14 @@ export function ListView({ squad, st, look, onOpen, selected }: {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-line/60">
               {rows.map((p) => (
-                <tr key={p.id} className={cn("hover:bg-surface-2/50", selected === p.id && "bg-info/10")}>
+                <tr key={p.id} className={cn("hover:bg-surface-2/50", selected === p.id && "bg-accent/[.07]")}>
                   <td className="p-2"><input type="checkbox" aria-label={`Comparar ${p.name}`} checked={cmp.includes(p.id)} onChange={() => setCmp((c) => (c.includes(p.id) ? c.filter((x) => x !== p.id) : [...c, p.id].slice(-2)))} /></td>
                   <td className="p-2">
                     <button type="button" className="flex items-center gap-2 text-left" onClick={() => onOpen(p.id)}>
                       <PlayerAvatar id={p.id} primary={look.primary} secondary={look.secondary} size={28} />
-                      <span className="font-semibold hover:text-info">{p.name}</span>
+                      <span className="font-semibold hover:text-accent">{p.name}</span>
                       {p.injured > 0 && <Badge tone="danger">Lesão {p.injured}j</Badge>}
                       {p.suspended > 0 && <Badge tone="warn">Castigo {p.suspended}j</Badge>}
                       {p.listed && <Badge tone="info">À venda</Badge>}
@@ -133,7 +133,7 @@ function Compare({ a, b, look, onClose }: { a: SquadP; b: SquadP; look: ClubLook
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Comparação</h3>
+        <h3 className="eyebrow">Comparação</h3>
         <button type="button" className="text-sm text-muted hover:text-ink" onClick={onClose}>Fechar</button>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 gap-y-1.5 text-sm">

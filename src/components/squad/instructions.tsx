@@ -1,4 +1,5 @@
 "use client";
+import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { LineupInstructions, Tactics } from "@/engine/common/types";
 import { archiveTacticPresetAction, saveTacticPresetAction } from "@/server/actions";
@@ -44,12 +45,12 @@ export function InstructionsTab({ gameId, squad, st, locked, presets, onTactics,
         <div className="grid gap-4 sm:grid-cols-2">
           {TACTIC_OPTIONS.map((t) => (
             <div key={t.key}>
-              <p className="mb-1 text-sm font-medium">{t.label}</p>
-              <div role="radiogroup" aria-label={t.label} className="grid grid-cols-3 gap-1 rounded-lg bg-bg p-1">
+              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{t.label}</p>
+              <div role="radiogroup" aria-label={t.label} className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-bg/70 p-1">
                 {t.opts.map(([v, l]) => (
                   <button key={v} type="button" role="radio" aria-checked={st.tactics[t.key] === v} disabled={locked}
                     onClick={() => onTactics({ ...st.tactics, [t.key]: v } as Tactics)}
-                    className={cn("rounded-md px-2 py-1.5 text-xs font-semibold", st.tactics[t.key] === v ? "bg-surface-2 text-ink shadow" : "text-muted hover:text-ink")}>{l}</button>
+                    className={cn("rounded-lg px-2 py-2 text-xs font-bold transition", st.tactics[t.key] === v ? "bg-accent text-accent-ink shadow-[0_0_18px_-6px_rgb(212_255_58/.7)]" : "text-muted hover:bg-surface-2 hover:text-ink")}>{l}</button>
                 ))}
               </div>
               <p className="mt-1 text-[11px] text-faint">{t.help}</p>
@@ -66,7 +67,7 @@ export function InstructionsTab({ gameId, squad, st, locked, presets, onTactics,
                 .sort((a, b) => (b.profile.set_pieces + b.ovr) - (a.profile.set_pieces + a.ovr));
               return (
                 <label key={t.key} className="block">
-                  <span className="text-sm font-medium">{t.label}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{t.label}</span>
                   <select className={cn(inputCls, "mt-1")} value={st.ins[t.key] ?? ""} disabled={locked} onChange={(e) => onIns(t.key, e.target.value || null)}>
                     <option value="">Automático</option>
                     {pool.map((p) => <option key={p.id} value={p.id}>{p.shirt !== null ? `${p.shirt} · ` : ""}{p.name} ({p.ovr})</option>)}
@@ -83,12 +84,12 @@ export function InstructionsTab({ gameId, squad, st, locked, presets, onTactics,
           <ul className="mb-3 space-y-2">
             {presets.length === 0 && <li className="text-sm text-faint">Ainda sem predefinições.</li>}
             {presets.map((pr) => (
-              <li key={pr.id} className="flex items-center gap-2 rounded-lg border border-line p-2">
+              <li key={pr.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-bg/40 p-2">
                 <FormationThumb f={pr.payload.formation} size={26} />
                 <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{pr.name}</p><p className="text-[11px] text-muted tabular">{pr.payload.formation}</p></div>
                 <Button type="button" variant="secondary" className="min-h-8 px-3" disabled={locked} onClick={() => onApplyPreset(pr.payload)}>Aplicar</Button>
                 <button type="button" className="rounded p-1 text-faint hover:text-danger" aria-label={`Apagar ${pr.name}`} disabled={pending}
-                  onClick={() => run(() => archiveTacticPresetAction({ gameId, presetId: pr.id }))}>✕</button>
+                  onClick={() => run(() => archiveTacticPresetAction({ gameId, presetId: pr.id }))}><X className="size-4" /></button>
               </li>
             ))}
           </ul>

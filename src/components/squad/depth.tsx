@@ -20,7 +20,7 @@ export function DepthChart({ squad, st, look, onOpen }: { squad: SquadP[]; st: E
         {counts.map(({ g, n, a }) => (
           <Card key={g} className="p-3">
             <p className="text-[11px] uppercase tracking-wider text-faint">{{ GK: "Guarda-redes", DEF: "Defesas", MID: "Médios", ATT: "Avançados" }[g]}</p>
-            <p className="text-2xl font-black tabular">{a}<span className="text-sm font-semibold text-faint">/{n}</span></p>
+            <p className="font-display text-3xl font-extrabold tabular">{a}<span className="text-sm font-semibold text-faint">/{n}</span></p>
             <p className="text-[11px] text-muted">disponíveis</p>
           </Card>
         ))}
@@ -34,7 +34,7 @@ export function DepthChart({ squad, st, look, onOpen }: { squad: SquadP[]; st: E
               .filter((x) => x.fit >= 0.85).sort((a, b) => b.eff - a.eff || b.fit - a.fit).slice(0, 3);
             const gap = top.length < 2 || (top[0]?.fit ?? 0) < 0.95;
             return (
-              <div key={slot} className={cn("rounded-xl border p-3", inFormation.has(slot) ? "border-accent/40 bg-accent/5" : "border-line")}>
+              <div key={slot} className={cn("rounded-2xl border p-3", inFormation.has(slot) ? "border-accent/40 bg-accent/[.05]" : "border-line bg-bg/30")}>
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-sm font-semibold">{SLOT_NAME[slot]}</p>
                   {gap && <span className="text-[11px] font-semibold text-warn">pouca profundidade</span>}

@@ -22,11 +22,13 @@ export interface PlayerRow {
 export async function listMyGames(userId: string) {
   return withUser(userId, async (c) => (await c.query(
     `select g.id, g.name, g.status, g.current_season, g.current_matchday, g.next_deadline_at, g.owner_user_id = $1 as is_owner,
-            ds.is_synthetic, gc.id as club_id, gc.name_snapshot as club_name, gc.primary_color,
+            ds.is_synthetic, gc.id as club_id, gc.name_snapshot as club_name, gc.short_name as club_short, gc.primary_color, gc.secondary_color,
+            sl.name as league_name, (select total_rounds from seasons where game_id = g.id and number = g.current_season) as total_rounds,
             (select count(*) from game_members m where m.game_id = g.id)::int as members,
             (select count(*) from notifications n where n.game_id = g.id and n.user_id = $1 and n.read_at is null)::int as unread
        from games g
        join dataset_snapshots ds on ds.id = g.dataset_snapshot_id
+       left join source_leagues sl on sl.id = g.source_league_id
        left join game_clubs gc on gc.game_id = g.id and gc.manager_user_id = $1
       order by g.created_at desc`, [userId])).rows);
 }
@@ -48,7 +50,7 @@ export async function getGame(userId: string, gameId: string) {
 
 export async function getClubs(userId: string, gameId: string) {
   return withUser(userId, async (c) => (await c.query(
-    `select gc.id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.reputation, gc.strength, gc.manager_user_id,
+    `select gc.id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.secondary_color, gc.reputation, gc.strength, gc.manager_user_id,
             pr.display_name as manager_name, (select count(*) from game_players p where p.club_id = gc.id)::int as squad_size
        from game_clubs gc left join profiles pr on pr.id = gc.manager_user_id
       where gc.game_id = $1 order by gc.strength desc, gc.name_snapshot`, [gameId])).rows);
@@ -100,7 +102,7 @@ export async function getClubColors(userId: string, clubId: string) {
 
 export async function getStandings(userId: string, gameId: string, seasonNumber?: number) {
   return withUser(userId, async (c) => (await c.query(
-    `select s.club_id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.manager_user_id, pr.display_name as manager_name,
+    `select s.club_id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.secondary_color, gc.manager_user_id, pr.display_name as manager_name,
             s.played, s.won, s.drawn, s.lost, s.gf, s.ga, s.gd, s.points, s.form
        from standings s join seasons se on se.id = s.season_id join game_clubs gc on gc.id = s.club_id
        left join profiles pr on pr.id = gc.manager_user_id
@@ -111,8 +113,8 @@ export async function getStandings(userId: string, gameId: string, seasonNumber?
 export async function getFixtures(userId: string, gameId: string, seasonNumber?: number) {
   return withUser(userId, async (c) => (await c.query(
     `select f.id, f.round_number, f.status, f.result_home, f.result_away, f.kickoff_at, f.home_club_id, f.away_club_id,
-            h.name_snapshot as home_name, h.short_name as home_short, h.primary_color as home_color,
-            a.name_snapshot as away_name, a.short_name as away_short, a.primary_color as away_color
+            h.name_snapshot as home_name, h.short_name as home_short, h.primary_color as home_color, h.secondary_color as home_color2,
+            a.name_snapshot as away_name, a.short_name as away_short, a.primary_color as away_color, a.secondary_color as away_color2
        from fixtures f join seasons se on se.id = f.season_id
        join game_clubs h on h.id = f.home_club_id join game_clubs a on a.id = f.away_club_id
       where f.game_id = $1 and se.number = coalesce($2, (select current_season from games where id = $1))
@@ -122,8 +124,8 @@ export async function getFixtures(userId: string, gameId: string, seasonNumber?:
 export async function getMatch(userId: string, gameId: string, fixtureId: string) {
   return withUser(userId, async (c) => {
     const f = await c.query(
-      `select f.*, h.name_snapshot as home_name, h.short_name as home_short, h.primary_color as home_color,
-              a.name_snapshot as away_name, a.short_name as away_short, a.primary_color as away_color,
+      `select f.*, h.name_snapshot as home_name, h.short_name as home_short, h.primary_color as home_color, h.secondary_color as home_color2,
+              a.name_snapshot as away_name, a.short_name as away_short, a.primary_color as away_color, a.secondary_color as away_color2,
               mr.result_json, mr.seed, mr.simulation_version, mr.input_hash
          from fixtures f join game_clubs h on h.id = f.home_club_id join game_clubs a on a.id = f.away_club_id
          left join match_runs mr on mr.fixture_id = f.id
@@ -144,8 +146,8 @@ export async function getMatch(userId: string, gameId: string, fixtureId: string
 
 export async function getPlayer(userId: string, gameId: string, playerId: string) {
   return withUser(userId, async (c) => {
-    const p = await c.query<PlayerRow & { club_name: string | null; manager_user_id: string | null; listed_price: string | null }>(
-      `select ${PLAYER_COLS}, gc.name_snapshot as club_name, gc.manager_user_id,
+    const p = await c.query<PlayerRow & { club_name: string | null; club_short: string | null; club_color: string | null; club_color2: string | null; manager_user_id: string | null; listed_price: string | null }>(
+      `select ${PLAYER_COLS}, gc.name_snapshot as club_name, gc.short_name as club_short, gc.primary_color as club_color, gc.secondary_color as club_color2, gc.manager_user_id,
               (select asking_price_cents from transfer_listings tl where tl.player_id = p.id and tl.status = 'active') as listed_price
          from game_players p left join game_clubs gc on gc.id = p.club_id where p.id = $1 and p.game_id = $2`, [playerId, gameId]);
     if (!p.rowCount) return null;
@@ -231,8 +233,9 @@ export async function getNotifications(userId: string, gameId: string) {
 
 export async function getNextFixture(userId: string, gameId: string, clubId: string) {
   return withUser(userId, async (c) => (await c.query(
-    `select f.id, f.round_number, f.kickoff_at, f.home_club_id, h.name_snapshot as home_name, a.name_snapshot as away_name,
-            h.primary_color as home_color, a.primary_color as away_color
+    `select f.id, f.round_number, f.kickoff_at, f.home_club_id, f.away_club_id, h.name_snapshot as home_name, a.name_snapshot as away_name,
+            h.short_name as home_short, a.short_name as away_short, h.primary_color as home_color, a.primary_color as away_color,
+            h.secondary_color as home_color2, a.secondary_color as away_color2
        from fixtures f join games g on g.id = f.game_id join seasons se on se.id = f.season_id and se.number = g.current_season
        join game_clubs h on h.id = f.home_club_id join game_clubs a on a.id = f.away_club_id
       where f.game_id = $1 and f.status <> 'completed' and $2 in (f.home_club_id, f.away_club_id)
@@ -241,8 +244,9 @@ export async function getNextFixture(userId: string, gameId: string, clubId: str
 
 export async function getLastResult(userId: string, gameId: string, clubId: string | null) {
   return withUser(userId, async (c) => (await c.query(
-    `select f.id, f.round_number, f.result_home, f.result_away, h.name_snapshot as home_name, a.name_snapshot as away_name,
-            h.primary_color as home_color, a.primary_color as away_color
+    `select f.id, f.round_number, f.result_home, f.result_away, f.home_club_id, f.away_club_id, h.name_snapshot as home_name, a.name_snapshot as away_name,
+            h.short_name as home_short, a.short_name as away_short, h.primary_color as home_color, a.primary_color as away_color,
+            h.secondary_color as home_color2, a.secondary_color as away_color2
        from fixtures f join game_clubs h on h.id = f.home_club_id join game_clubs a on a.id = f.away_club_id
       where f.game_id = $1 and f.status = 'completed' and ($2::uuid is null or $2 in (f.home_club_id, f.away_club_id))
       order by f.completed_at desc limit 1`, [gameId, clubId])).rows[0] ?? null);

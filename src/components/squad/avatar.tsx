@@ -2,6 +2,7 @@
  * Generated, deterministic visuals — no real photos, crests or kits (no licensing issues).
  * Each player gets a stylised avatar derived from a hash of his id; clubs get a generated shield in their colours.
  */
+import { useId } from "react";
 import { cn } from "../ui";
 
 function hash(s: string): number {
@@ -30,6 +31,7 @@ export function PlayerAvatar({ id, primary, secondary, size = 40, className, tit
   id: string; primary: string; secondary: string; size?: number; className?: string; title?: string;
 }) {
   const h = hash(id);
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const skin = pick(SKIN, h, 0);
   const hair = pick(HAIR, h, 4);
   const style = (h >>> 8) % 6; // 0 bald, 1 short, 2 crop, 3 curly, 4 long, 5 mohawk
@@ -38,9 +40,9 @@ export function PlayerAvatar({ id, primary, secondary, size = 40, className, tit
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} className={cn("shrink-0 rounded-full bg-surface-2", className)} role="img" aria-label={title ?? "Avatar"}>
       <defs>
-        <clipPath id={`c-${id}`}><circle cx="32" cy="32" r="32" /></clipPath>
+        <clipPath id={`c-${uid}`}><circle cx="32" cy="32" r="32" /></clipPath>
       </defs>
-      <g clipPath={`url(#c-${id})`}>
+      <g clipPath={`url(#c-${uid})`}>
         <rect width="64" height="64" fill="#1b2944" />
         {/* shirt */}
         <path d="M6 64 C8 50 18 45 32 45 C46 45 56 50 58 64 Z" fill={primary} />
@@ -77,7 +79,7 @@ export function ClubBadge({ seed, name, short, primary, secondary, size = 36, cl
   const h = hash(seed);
   const pattern = h % 4; // 0 plain, 1 stripes, 2 sash, 3 chevron
   const ink = contrastInk(primary);
-  const id = `b-${h.toString(36)}`;
+  const id = `b-${h.toString(36)}-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const shield = "M32 3 L58 11 C58 34 50 52 32 61 C14 52 6 34 6 11 Z";
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} className={cn("shrink-0", className)} role="img" aria-label={`Emblema ${name}`}>
