@@ -31,6 +31,18 @@ npm run sim:calibrate         # 100 000 jogos → reports/calibration-*.json/htm
 npm run sim:seasons -- 10     # balanço de progressão/economia a 10 épocas
 ```
 
+### CI (`.github/workflows/ci.yml`)
+
+Corre em cada PR e em cada push para `main`, em três jobs paralelos:
+
+| Job | O quê |
+|---|---|
+| `checks` | `npm run lint` + `npm test` |
+| `integration` | `npm run test:integration` contra um serviço `postgres:17` (shim + migrations por suite) |
+| `build-e2e` | `next build` → `npm run typecheck` → verifica que `DEV_AUTH_SECRET`/`CRON_SECRET`/`SUPABASE_DB_URL` não aparecem em `.next/static` → BD `touchline_e2e` + seed sintético → `next start` (`AUTH_MODE=dev`) → Playwright. Em falha, o relatório, traces e `server.log` ficam como artefacto `e2e-report`. |
+
+O CI não usa segredos reais nem contas Supabase. O Dependabot (`.github/dependabot.yml`) abre PRs semanais de dependências npm (`next` e `eslint-config-next` agrupados) e mensais de GitHub Actions. Recomendado: proteger `main` no GitHub (Settings → Branches) exigindo os três jobs antes do merge.
+
 ## Importar ligas reais (PlayerElo)
 
 Pré-requisitos: `PLAYERELO_API_KEY` e `SUPABASE_DB_URL` (session pooler) em `.env.local`. Ler `docs/data-licensing.md`.
