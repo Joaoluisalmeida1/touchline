@@ -24,12 +24,25 @@ O adaptador `AUTH_MODE=dev` guarda contas na tabela `auth.users` do shim. **Nunc
 
 ```bash
 npm run lint && npm run typecheck
-npm test                      # engines (unitários)
-npm run test:integration      # Postgres real: RLS, comandos, jornada, mercado, importador (precisa LOCAL_PG_URL)
-npm run test:e2e              # app a correr em :3000 (AUTH_MODE=dev + seed sintético)
+npm test                      # projeto Vitest "unit": engines, golden master, env, pg-config (sem BD, em paralelo)
+npm run test:integration      # projeto "integration": Postgres real — RLS, comandos, jornada, mercado, importador,
+                              #   queries.ts, Server Actions e rotas /api (precisa LOCAL_PG_URL, uma BD por suite)
+npm run test:coverage         # unit + integration com cobertura → coverage/ (falha abaixo dos limites)
+npm run test:e2e              # Playwright; arranca `npm run dev` se nada estiver em :3000 (AUTH_MODE=dev + seed sintético)
 npm run sim:calibrate         # 100 000 jogos → reports/calibration-*.json/html (fora do CI)
 npm run sim:seasons -- 10     # balanço de progressão/economia a 10 épocas
 ```
+
+| Camada | Onde | O que garante |
+|---|---|---|
+| Unitários | `src/**/*.test.ts` | Engines determinísticos, propriedades de balanço, validação de env, config do pool |
+| Golden master | `src/engine/golden.test.ts` + `__snapshots__/` | Mesmo seed + mesma versão ⇒ resultado idêntico (ver abaixo) |
+| Integração | `tests/integration/` | SQL, RLS e invariantes de segurança; caminho real de leitura (`queries.ts`), Server Actions e `/api/*` com só a sessão simulada |
+| E2E | `tests/e2e/` | Fluxo completo de dois amigos, guardas de rotas (anónimo → `/auth`, não-membro → 404), mobile |
+
+**Cobertura**: limites em `vitest.config.mts` (global e `src/engine/**`), ligeiramente abaixo dos valores medidos. Sobem quando a cobertura sobe; nunca se baixam para fazer passar um PR. O relatório HTML fica em `coverage/index.html`.
+
+**Golden master**: cada teste tem a versão do algoritmo no nome (`match engine @ match-v1.0.0`). Se o resultado mudar sem subir a versão, o snapshot falha. Mudança intencional: subir a constante (`ENGINE_VERSION`, `INITIAL_RATING_VERSION`, `PROGRESSION_VERSION`, `ECONOMY_VERSION`), correr `npx vitest run -u src/engine/golden.test.ts` e fazer commit do snapshot novo. Nunca atualizar um hash mantendo a mesma versão.
 
 ### CI (`.github/workflows/ci.yml`)
 
@@ -37,8 +50,8 @@ Corre em cada PR e em cada push para `main`, em três jobs paralelos:
 
 | Job | O quê |
 |---|---|
-| `checks` | `npm run lint` + `npm test` |
-| `integration` | `npm run test:integration` contra um serviço `postgres:17` (shim + migrations por suite) |
+| `checks` | `npm run lint` + `npm test` (feedback rápido) |
+| `integration` | `npm run test:coverage` (unit + integração) contra um serviço `postgres:17`; aplica os limites de cobertura, publica a tabela de cobertura no resumo do job e o relatório como artefacto `coverage-report` |
 | `build-e2e` | `next build` → `npm run typecheck` → verifica que `DEV_AUTH_SECRET`/`CRON_SECRET`/`SUPABASE_DB_URL` não aparecem em `.next/static` → BD `touchline_e2e` + seed sintético → `next start` (`AUTH_MODE=dev`) → Playwright. Em falha, o relatório, traces e `server.log` ficam como artefacto `e2e-report`. |
 
 O CI não usa segredos reais nem contas Supabase. O Dependabot (`.github/dependabot.yml`) abre PRs semanais de dependências npm (`next` e `eslint-config-next` agrupados) e mensais de GitHub Actions. Recomendado: proteger `main` no GitHub (Settings → Branches) exigindo os três jobs antes do merge.

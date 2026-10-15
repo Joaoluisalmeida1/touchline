@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { Pool, type PoolClient } from "pg";
+import { asUser as asUserProd } from "../../src/server/pg";
 
 export const LOCAL_PG = process.env.LOCAL_PG_URL ?? "postgres://postgres@localhost:54322";
 
@@ -10,13 +11,17 @@ export function freshDb(name: string): Pool {
   return new Pool({ connectionString: `${LOCAL_PG}/${name}`, max: 8 });
 }
 
-/** Run fn exactly like PostgREST would for a signed-in user: role authenticated + JWT claims. */
+/**
+ * Run fn as a signed-in user through the PRODUCTION helper (src/server/pg.ts), so integration tests exercise the exact
+ * claims + role switch the app uses. `null` runs as `anon`, which the app never does (only tests probe it).
+ */
 export async function asUser<T>(pool: Pool, userId: string | null, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  if (userId) return asUserProd(pool, userId, fn);
   const c = await pool.connect();
   try {
     await c.query("begin");
-    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(userId ? { sub: userId, role: "authenticated" } : { role: "anon" })]);
-    await c.query(userId ? "set local role authenticated" : "set local role anon");
+    await c.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ role: "anon" })]);
+    await c.query("set local role anon");
     const r = await fn(c);
     await c.query("commit");
     return r;
