@@ -44,6 +44,7 @@ Com Supabase real: ver [`docs/deployment.md`](docs/deployment.md). Importar liga
 |---|---|
 | `npm run verify` | lint + typecheck + todos os testes Vitest |
 | `npm test` / `npm run test:integration` / `npm run test:e2e` | unitários / Postgres real / Playwright |
+| `npm run test:coverage` | unit + integração com cobertura e limites mínimos (ver [guia do operador](docs/operator-guide.md#testes)) |
 | `npm run sim:calibrate` | 100 000 jogos → `reports/calibration-*.{json,html}` |
 | `npm run sim:seasons -- 10` | balanço de progressão e economia |
 | `npm run playerelo:*` | pipeline de importação (ver operator guide) |

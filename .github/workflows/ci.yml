@@ -32,7 +32,7 @@ jobs:
       - run: npm test
 
   integration:
-    name: Integration tests (Postgres)
+    name: All tests + coverage (Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -53,7 +53,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run test:integration
+      # unit + integration with coverage thresholds (vitest.config.mts); fails the job if coverage drops
+      - run: npm run test:coverage
+      - name: Coverage summary
+        if: always() && hashFiles('coverage/coverage-summary.json') != ''
+        run: node scripts/ci/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage report
+        if: always() && hashFiles('coverage/coverage-summary.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
   build-e2e:
     name: Build + typecheck + E2E

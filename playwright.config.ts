@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
  * E2E against a running app (default http://localhost:3000).
  * Locally without Supabase: AUTH_MODE=dev + a local Postgres seeded with `npm run seed:synthetic`.
  * Against a real deployment: E2E_BASE_URL=https://... (email confirmation must be disabled for test accounts).
+ * Without E2E_BASE_URL, Playwright starts `npm run dev` itself unless something already listens on :3000 (CI starts
+ * the production build first and is reused).
  */
 export default defineConfig({
   testDir: "tests/e2e",
@@ -24,4 +26,7 @@ export default defineConfig({
     { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile\.spec\.ts/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ },
   ],
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : { command: "npm run dev", url: "http://localhost:3000/api/health", reuseExistingServer: true, timeout: 120_000 },
 });

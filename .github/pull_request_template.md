@@ -49,7 +49,7 @@
 - [ ] The migration is safe to run on existing data and was tested with `npm run db:local:reset`
 
 ### Game engine (skip if no engine change)
-- [ ] I bumped the relevant version (`ENGINE_VERSION`, `INITIAL_RATING_VERSION`, `PROGRESSION_VERSION`, `ECONOMY_VERSION`) if results change for the same seed and input
+- [ ] I bumped the relevant version (`ENGINE_VERSION`, `INITIAL_RATING_VERSION`, `PROGRESSION_VERSION`, `ECONOMY_VERSION`) if results change for the same seed and input, and recorded the new golden snapshot (`npx vitest run -u src/engine/golden.test.ts`)
 - [ ] I ran `npm run sim:quick` / `sim:calibrate` and the key metrics stay within the bands in `docs/game-balance.md`
 
 ### Security

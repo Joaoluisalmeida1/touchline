@@ -1,2 +1,4 @@
 # Shell scripts must keep LF endings (they run on Linux CI and in Git Bash)
 *.sh text eol=lf
+# Test snapshots are compared byte-for-byte; keep them identical on Windows checkouts and Linux CI
+*.snap text eol=lf

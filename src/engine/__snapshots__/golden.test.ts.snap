@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden master > initial rating @ initial-rating-v1 > full output hash 1`] = `"f306f65d5be44613afbb431d12def1fbd6831adee6e1d55bdf64b44d7520383c"`;
+
+exports[`golden master > match engine @ match-v1.0.0 > full output hash 1`] = `"6223f3c0b37fec77aa037e006ea16749fdb3723a2f68688d5ac78f26b6f4766c"`;
+
+exports[`golden master > match engine @ match-v1.0.0 > scores 1`] = `
+[
+  "3-1",
+  "3-0",
+  "0-5",
+]
+`;
+
+exports[`golden master > one league season @ match-v1.0.0 + progression-v1 + economy-v1 + initial-rating-v1 > full output hash 1`] = `"636711523a6a49190e0fac977a203191638900dc6ceec686cc9fcbc7445cedce"`;
+
+exports[`golden master > one league season @ match-v1.0.0 + progression-v1 + economy-v1 + initial-rating-v1 > season summary 1`] = `
+{
+  "avgGoals": "2.6961",
+  "avgOvr": "73.8400",
+  "drawRate": "0.2157",
+}
+`;
