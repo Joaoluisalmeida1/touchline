@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { TRAIT_INFO, traitOf } from "@/engine/narrative/traits";
 import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { LineupInstructions, Slot } from "@/engine/common/types";
@@ -94,6 +95,7 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
         </div>
       )}
 
+      <p className="text-xs text-muted" title={TRAIT_INFO[traitOf(p.id)].hint}>Personalidade: <b className="text-ink">{TRAIT_INFO[traitOf(p.id)].label}</b> · <span className="text-faint">{TRAIT_INFO[traitOf(p.id)].hint}</span></p>
       <div className="grid grid-cols-3 gap-2 text-center">
         {[["Condição", <Meter key="f" value={p.fitness} label="Condição" />], ["Moral", <Meter key="m" value={p.morale} label="Moral" tone="bg-info" />], ["Forma", <FormArrow key="fo" form={p.form} />]].map(([l, el]) => (
           <div key={l as string} className="rounded-lg bg-bg/50 p-2"><p className="mb-1 text-[10px] uppercase tracking-wide text-faint">{l}</p><div className="flex justify-center">{el}</div></div>

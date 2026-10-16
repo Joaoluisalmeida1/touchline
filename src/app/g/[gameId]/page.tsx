@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, ClipboardList, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Crest } from "@/components/crest";
 import { AnimatedNumber } from "@/components/fx/animated-number";
@@ -11,20 +11,27 @@ import { requireUser } from "@/server/auth";
 import { getClubs, getGame, getLastResult, getNextFixture, getNotifications, getStandings } from "@/server/queries";
 import { notificationText } from "@/lib/notifications";
 import { getLatestHeadlines } from "@/server/league-queries";
+import { getWeekPending } from "@/server/week-queries";
+import { getPool } from "@/server/db";
+import { ensureWeek } from "@/server/services/week";
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
   member_joined: <UserPlus />, game_started: <Flag />, matchday_completed: <CalendarDays />, season_completed: <Trophy />,
-  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />,
+  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />, week_ready: <ClipboardList />,
 };
 
 export default async function Overview({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = await params;
   const user = await requireUser();
   const game = (await getGame(user.id, gameId))!;
-  const [clubs, standings, notifications, last, next, headlines] = await Promise.all([
+  if (game.status === "active" && game.my_club_id) {
+    await ensureWeek(getPool(), gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "week.ensure_failed", error: (e as Error).message })));
+  }
+  const [clubs, standings, notifications, last, next, headlines, pending] = await Promise.all([
     getClubs(user.id, gameId), getStandings(user.id, gameId).catch(() => []), getNotifications(user.id, gameId),
     getLastResult(user.id, gameId, game.my_club_id), game.my_club_id ? getNextFixture(user.id, gameId, game.my_club_id) : null,
     getLatestHeadlines(user.id, gameId, 3).catch(() => []),
+    game.my_club_id && game.status === "active" ? getWeekPending(user.id, gameId, game.my_club_id).catch(() => null) : null,
   ]);
   const myClub = clubs.find((c) => c.id === game.my_club_id);
   const unread = notifications.filter((n) => !n.read_at).length;
@@ -175,6 +182,18 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
       </Stagger>
 
       <Stagger className="space-y-5" gap={0.08}>
+        {pending && (pending.events > 0 || pending.press > 0) && (
+          <StaggerItem>
+            <Card glow>
+              <CardTitle icon={<ClipboardList />}>Semana de jornada</CardTitle>
+              <ul className="space-y-1.5 text-sm">
+                {pending.press > 0 && <li className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-accent" />Conferência de imprensa por responder</li>}
+                {pending.events > 0 && <li className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-accent" />{pending.events} {pending.events === 1 ? "assunto" : "assuntos"} no Gabinete</li>}
+              </ul>
+              <ButtonLink href={`/g/${gameId}/week`} className="mt-4 w-full">Abrir a semana <ArrowRight className="size-4" /></ButtonLink>
+            </Card>
+          </StaggerItem>
+        )}
         {headlines.length > 0 && (
           <StaggerItem>
             <Card>

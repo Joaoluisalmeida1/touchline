@@ -36,7 +36,7 @@ Formato: decisão · porquê · como mudar. Todos os parâmetros de jogo estão 
 - **IA de mercado**: clube IA responde de imediato — aceita se `valor ≥ preço pedido` (valor de mercado × 1,15–1,60 conforme importância no plantel, −0,20 em fim de contrato), senão recusa e devolve contraproposta. IA não compra (pós-MVP).
 - **Agentes livres**: não suportados no MVP.
 - **Lesões/castigos** contam em jogos (`injured_matches`), não em datas. Castigo: vermelho direto 2 jogos, 2.º amarelo 1 jogo, 5 amarelos acumulados 1 jogo.
-- **Idade**: só com data de nascimento verificada. A API PlayerElo documentada não expõe DOB → jogadores reais ficam `age = null`, sem envelhecimento numérico nem declínio por idade.
+- **Idade**: só com data de nascimento verificada. A API PlayerElo documentada não expõe DOB → por omissão `age = null`. O script `wikidata:ages` preenche datas reais do Wikidata (CC0) só quando há uma correspondência única (nome + clube), com precisão ao dia e idade plausível (15–45); o resto continua desconhecido.
 - **Potencial**: inferido pelo jogo, oculto (só banda A–E visível; coluna sem `GRANT`).
 - **Convites**: código de 16 caracteres (80 bits), só o hash SHA-256 é guardado; 7 dias; rotação invalida o anterior; erro idêntico para inválido/expirado/revogado.
 - **Eliminação de liga**: não exposta no MVP. As FKs são `on delete cascade` a partir de `games`, por isso um `delete from games where id = …` (operador) remove tudo de forma consistente; recomendado `status = 'archived'`.
@@ -59,3 +59,12 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 - **Conferências de imprensa**: o treinador escreve o que quiser e escolhe um tom (Confiante · Calmo · Provocador · Evasivo); o tom decide os efeitos, o texto é citado no jornal.
 - **Direção**: a confiança da direção tem consequências (orçamento, objetivos, avisos), mas **ninguém é despedido**.
 - **Entrega**: um branch por fase (`feat/phase-N-…`), testado e integrado antes da fase seguinte.
+
+### Fase 2 (2026-10-16)
+
+- **Tom vs texto**: o texto da conferência nunca é interpretado (sem moderação automática nem LLM); só o tom tem efeitos. O texto é público para a liga depois de responder — é uma liga entre amigos.
+- **Mind games**: só contra treinadores humanos; resposta "Calma" do rival anula. Efeito pequeno (−0,3 controlo por resposta provocadora) para não decidir jogos.
+- **IA no Gabinete**: mesmos eventos e probabilidades, sempre a opção por omissão (a mais prudente; quem responde pode escolher melhor, mas a vantagem é pequena).
+- **Prazo**: todos os assuntos expiram no início da jornada seguinte (sem prazos de vários dias nesta fase).
+- **Compatibilidade**: clubes sem plano de treino/jogo e sem conferência jogam exatamente como antes; os testes *golden* do motor não mudam.
+- **Wikidata**: corre no PC do operador (o ambiente de build não acede ao Wikidata). Só APIs oficiais (pesquisa + SPARQL), 1 pedido/1,1 s, User-Agent identificável (`WIKIDATA_CONTACT` opcional). Proveniência gravada em `source_players.attributes_json.birth_date`.

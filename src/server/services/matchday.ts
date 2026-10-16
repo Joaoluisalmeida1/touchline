@@ -10,9 +10,12 @@ import type { Formation, LineupInstructions, Tactics } from "../../engine/common
 import { ENGINE_VERSION } from "../../engine/match/config";
 import { processRound, seasonEnd, type LeagueClub, type LeaguePlayer, type StandingRow } from "../../engine/league/round";
 import type { LineupEntry } from "../../engine/lineup/autopick";
+import type { MatchPlanRule } from "../../engine/match/types";
+import type { TrainingPlan } from "../../engine/training/training";
 import { asService } from "../pg";
 import { publishRound } from "./newspaper";
 import { flushPush } from "./push";
+import { prepareWeek } from "./week";
 
 export interface MatchdayResult {
   status: "processed" | "skipped";
@@ -25,15 +28,29 @@ export interface MatchdayResult {
 
 const log = (msg: string, ctx: Record<string, unknown>) => console.log(JSON.stringify({ level: "info", msg, ...ctx }));
 
-export async function loadLeagueState(pool: Pool, gameId: string) {
+/** `at` = the round about to be played: its answered press conferences feed the match (phase 2). */
+export async function loadLeagueState(pool: Pool, gameId: string, at?: { season: number; round: number }) {
   return asService(pool, async (c) => {
     const clubs = await c.query(
       `select gc.id, gc.name_snapshot, gc.reputation, t.formation, t.mentality, t.tempo, t.pressing, t.defensive_line, t.width,
-              t.passing_directness, t.transitions, l.formation as l_formation, l.starters_json, l.bench_json, l.instructions_json
+              t.passing_directness, t.transitions, l.formation as l_formation, l.starters_json, l.bench_json, l.instructions_json,
+              tp.intensity as tr_intensity, tp.focus as tr_focus, mp.rules as mp_rules, mp.marking as mp_marking
          from public.game_clubs gc
          left join public.tactics t on t.club_id = gc.id
          left join public.lineups l on l.club_id = gc.id and l.fixture_id is null
+         left join public.training_plans tp on tp.club_id = gc.id
+         left join public.match_plans mp on mp.club_id = gc.id
         where gc.game_id = $1 order by gc.id`, [gameId]);
+    const press = new Map<string, { own_control?: number; opp_control?: number; calm?: boolean }>();
+    if (at) {
+      const pr = await c.query(
+        `select club_id, effects from public.press_conferences
+          where game_id = $1 and season = $2 and round = $3 and answered_at is not null`, [gameId, at.season, at.round]);
+      for (const r of pr.rows) {
+        const e = r.effects ?? {};
+        press.set(r.club_id, { own_control: Number(e.own_control ?? 0), opp_control: Number(e.opp_control ?? 0), calm: !!e.calm });
+      }
+    }
     const players = await c.query(
       `select id, version, club_id, name_snapshot, position_group, position_detail, age, current_ovr, potential_cap, potential_band,
               hidden_development_rate, form, morale, fitness, sharpness, fatigue, injured_matches, injury_type, suspension_matches,
@@ -51,6 +68,10 @@ export async function loadLeagueState(pool: Pool, gameId: string) {
         formation: r.l_formation, starters: r.starters_json as LineupEntry[], bench: (r.bench_json ?? []) as string[],
         instructions: (r.instructions_json ?? {}) as LineupInstructions,
       } : null,
+      ...(r.tr_intensity ? { training: { intensity: r.tr_intensity, focus: r.tr_focus } as TrainingPlan } : {}),
+      ...(Array.isArray(r.mp_marking) && r.mp_marking.length ? { marking: r.mp_marking as string[] } : {}),
+      ...(Array.isArray(r.mp_rules) && r.mp_rules.length ? { plans: r.mp_rules as MatchPlanRule[] } : {}),
+      ...(press.has(r.id) ? { press: press.get(r.id)! } : {}),
     }));
     const leaguePlayers: LeaguePlayer[] = players.rows.map((r) => ({
       id: r.id, version: r.version, club_id: r.club_id, name: r.name_snapshot, position_group: r.position_group,
@@ -89,7 +110,9 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
       [begin.season_id, round])).rows);
     const pending = fixtures.filter((f) => f.status !== "completed");
     const done = fixtures.filter((f) => f.status === "completed");
-    const state = await loadLeagueState(pool, gameId);
+    // Gabinete: events whose deadline is this round fall back to their default choice before the squads are read
+    await asService(pool, (c) => c.query(`select public.resolve_due_events($1, $2)`, [gameId, round]));
+    const state = await loadLeagueState(pool, gameId, { season, round });
     const outcome = processRound({
       gameId, season, round, clubs: state.clubs, players: state.players, fixtures: pending,
       alreadyPlayedClubIds: done.flatMap((f) => [f.home_club_id, f.away_club_id]),
@@ -103,6 +126,7 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
         result: {
           home_goals: fo.result.home_goals, away_goals: fo.result.away_goals, team_stats: fo.result.team_stats,
           momentum: fo.result.momentum, duration_seconds: Math.round(fo.result.duration_seconds),
+          ...(fo.result.plans_fired ? { plans_fired: fo.result.plans_fired } : {}),
         },
         events: fo.result.events.map((e) => ({
           sequence_number: e.sequence_number, minute: e.minute, second: e.second, club_id: e.club_id, player_id: e.player_id,
@@ -140,6 +164,14 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
       log("newspaper.published", { ...ctx, round });
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "newspaper.failed", ...ctx, round, error: (e as Error).message }));
+    }
+    if (!complete.season_complete) {
+      try {
+        await prepareWeek(pool, gameId, season, round + 1);
+        log("week.prepared", { ...ctx, next_round: round + 1 });
+      } catch (e) {
+        console.error(JSON.stringify({ level: "error", msg: "week.failed", ...ctx, round, error: (e as Error).message }));
+      }
     }
     await flushPush(pool).catch((e) => console.error(JSON.stringify({ level: "error", msg: "push.failed", ...ctx, error: (e as Error).message })));
     let seasonCompleted = false;

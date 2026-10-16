@@ -27,12 +27,63 @@ export const HEADLINES: Record<StoryKind, readonly string[]> = {
   goal_fest: ["Festival de golos: {home} {score} {away}", "Chuva de golos entre {home} e {away}"],
   human_result: ["{club}: {verdict}", "{mgr} e o seu {club}: {verdict}"],
   title_race: ["{club} isolado na frente a {left} jornadas do fim", "Corrida ao título: {gap} pontos separam {club} de {second}"],
+  press: ["{mgr}: «{quote}»", "As palavras de {mgr} antes do {opp}"],
+};
+
+/** press headlines by (tone of the strongest answer, result of the match that followed) */
+export const PRESS_HEADLINES: Record<"provocative" | "confident" | "calm", Record<"W" | "D" | "L", readonly string[]>> = {
+  provocative: {
+    W: ["{mgr} provocou e cumpriu frente ao {opp}", "Palavra dada: {mgr} picou o {opp} e ganhou"],
+    D: ["Muita conversa, pouco futebol: {mgr} empata com o {opp}", "{mgr} provocou, o {opp} segurou o empate"],
+    L: ["{mgr} falou demais: {club} perde com o {opp}", "As provocações viraram-se contra {mgr}"],
+  },
+  confident: {
+    W: ["{mgr} confiante e certeiro", "{mgr} prometeu e o {club} entregou"],
+    D: ["{mgr} queria mais: empate com o {opp}", "Confiança de {mgr} não chegou para vencer"],
+    L: ["Confiança de {mgr} cai por terra", "{mgr} prometeu, o {opp} estragou a festa"],
+  },
+  calm: {
+    W: ["Serenidade de {mgr} dá frutos", "{mgr} pediu calma e o {club} respondeu"],
+    D: ["{mgr} sereno no empate com o {opp}", "Sem dramas: {mgr} e o {club} somam um ponto"],
+    L: ["{mgr} pede calma depois da derrota", "Nem a calma de {mgr} salvou o {club}"],
+  },
 };
 
 const BASE: Record<StoryKind, number> = {
   derby: 62, upset: 50, thrashing: 44, hat_trick: 48, comeback: 56, late_winner: 46, new_leader: 52, red_card: 28,
-  goal_fest: 38, human_result: 22, title_race: 40,
+  goal_fest: 38, human_result: 22, title_race: 40, press: 30,
 };
+
+const TONE_RANK = { provocative: 3, confident: 2, calm: 1, evasive: 0 } as const;
+
+/** One story per answered press conference: the strongest quote, judged against the result that followed. */
+function pressStories(ctx: Ctx): Story[] {
+  const out: Story[] = [];
+  for (const pc of [...(ctx.facts.press ?? [])].sort((a, b) => a.club_id.localeCompare(b.club_id))) {
+    const club = ctx.club.get(pc.club_id);
+    if (!club?.manager) continue;
+    const said = pc.answers.filter((a) => a.text.trim()).sort((a, b) => TONE_RANK[b.tone] - TONE_RANK[a.tone]);
+    const top = said[0];
+    if (!top) continue;
+    const opp = pc.opponent_id ? ctx.club.get(pc.opponent_id) : undefined;
+    const m = ctx.facts.matches.find((x) => x.home_id === pc.club_id || x.away_id === pc.club_id);
+    const gf = m ? (m.home_id === pc.club_id ? m.home_goals : m.away_goals) : 0;
+    const ga = m ? (m.home_id === pc.club_id ? m.away_goals : m.home_goals) : 0;
+    const res = gf > ga ? "W" : gf === ga ? "D" : "L";
+    const quote = top.text.trim().replace(/\s+/g, " ");
+    const vars = { mgr: club.manager, club: club.name, opp: opp?.name ?? "adversário", quote: quote.length > 70 ? `${quote.slice(0, 67)}…` : quote };
+    const templates = m && top.tone !== "evasive" ? PRESS_HEADLINES[top.tone][res] : HEADLINES.press;
+    const lines = said.slice(0, 2).map((a) => `«${a.text.trim()}»`).join(" ");
+    const body = `Na antevisão${opp ? ` do jogo com o ${opp.name}` : ""}, ${club.manager} disse: ${lines}` +
+      (m ? ` Resultado: ${club.short} ${gf}–${ga}${opp ? ` ${opp.short}` : ""}.` : "");
+    const humanOpp = opp?.manager ? 1 : 0;
+    out.push(story(ctx, "press", vars, {
+      templates, club_ids: [pc.club_id, ...(opp ? [opp.id] : [])].slice(0, 1 + humanOpp), body,
+      score: BASE.press + TONE_RANK[top.tone] * 6 + (top.tone === "provocative" && res === "L" ? 15 : 0),
+    }));
+  }
+  return out;
+}
 
 interface Ctx { facts: RoundFacts; club: Map<string, NClub>; rng: Rng }
 
@@ -217,6 +268,7 @@ export function buildEdition(facts: RoundFacts): Edition {
   const t = tableStories(ctx);
   stories.push(...t.stories);
   log.push(...t.facts);
+  stories.push(...pressStories(ctx));
 
   // one story per fixture on the page: keep the most dramatic angle, mention the rest in its body
   const best = new Map<string, Story>();

@@ -16,6 +16,8 @@ import {
   type SeasonEndUpdate,
 } from "../progression/progression";
 import { prizeMoneyCents } from "../economy/economy";
+import { applyTraining, planModifiers, type TrainingPlan } from "../training/training";
+import type { MatchPlanRule } from "../match/types";
 
 export interface LeaguePlayer extends PlayerState {
   name: string;
@@ -37,6 +39,22 @@ export interface LeagueClub {
   reputation: number;
   tactics: Tactics & { formation: Formation };
   saved_lineup: { formation: string; starters: LineupEntry[]; bench: string[]; instructions?: LineupInstructions } | null;
+  /** weekly training plan (absent = no plan: nothing changes) */
+  training?: TrainingPlan | null;
+  /** match plan: man-marking targets (opponent player ids) and conditional second-half rules */
+  marking?: string[];
+  plans?: MatchPlanRule[];
+  /** answered press conference for this round */
+  press?: { own_control?: number; opp_control?: number; calm?: boolean } | null;
+}
+
+/** Unit modifiers for `club` against `opp`: training focus + own press confidence + opponent's mind games (unless calm). */
+export function clubModifiers(club: LeagueClub, opp: LeagueClub): { control?: number; attack?: number; defense?: number } | undefined {
+  const m = { ...(planModifiers(club.training) ?? {}) };
+  const add = (k: "control", v: number) => { if (v) m[k] = Math.round(((m[k] ?? 0) + v) * 100) / 100; };
+  add("control", club.press?.own_control ?? 0);
+  if (!club.press?.calm) add("control", opp.press?.opp_control ?? 0);
+  return Object.keys(m).length ? m : undefined;
 }
 
 export interface RoundFixture {
@@ -124,8 +142,22 @@ export function processRound(args: {
     const hl = resolveLineup(hs.map(toSquad), home.saved_lineup, home.tactics.formation);
     const al = resolveLineup(as.map(toSquad), away.saved_lineup, away.tactics.formation);
     const byId = new Map([...hs, ...as].map((p) => [p.id, p]));
-    const team = (club: LeagueClub, l: ResolvedLineup) => ({
+    const team = (club: LeagueClub, l: ResolvedLineup, opp: LeagueClub, oppSquad: LeaguePlayer[]) => {
+      const mods = clubModifiers(club, opp);
+      const oppIds = new Set(oppSquad.map((p) => p.id));
+      const marking = (club.marking ?? []).filter((id) => oppIds.has(id)).slice(0, 2);
+      const own = new Set([...l.starters.map((s) => s.player_id), ...l.bench]);
+      const plans: MatchPlanRule[] = [];
+      for (const r of (club.plans ?? []).slice(0, 3)) {
+        const sub = r.sub && own.has(r.sub.out) && own.has(r.sub.in) ? r.sub : undefined;
+        if (!r.mentality && !sub) continue;
+        plans.push({ minute: r.minute, when: r.when, ...(r.mentality ? { mentality: r.mentality } : {}), ...(sub ? { sub } : {}) });
+      }
+      return {
       club_id: club.id, name: club.name, formation: l.formation,
+      ...(mods ? { modifiers: mods } : {}),
+      ...(marking.length ? { marking } : {}),
+      ...(plans.length ? { plans } : {}),
       ...(sanitizeInstructions(club.saved_lineup?.instructions, l) ? { instructions: sanitizeInstructions(club.saved_lineup?.instructions, l) } : {}),
       tactics: {
         mentality: club.tactics.mentality, tempo: club.tactics.tempo, pressing: club.tactics.pressing,
@@ -134,8 +166,9 @@ export function processRound(args: {
       },
       starters: l.starters.map((s) => toMatchPlayer(byId.get(s.player_id)!, s.slot, s.role)),
       bench: l.bench.map((id) => toMatchPlayer(byId.get(id)!)),
-    });
-    const input: MatchInput = { fixture_id: f.id, home: team(home, hl), away: team(away, al) };
+      };
+    };
+    const input: MatchInput = { fixture_id: f.id, home: team(home, hl, away, as), away: team(away, al, home, hs) };
     const seed = fixtureSeed(gameId, season, round, f.id);
     const input_hash = hashInput({ input, seed, engine: ENGINE_VERSION });
     const result = simulateMatch(input, seed);
@@ -159,6 +192,13 @@ export function processRound(args: {
       } : null;
       const { update, log } = progressPlayer(p, perf, { season, round, clubPlayed: true, reputation: clubById.get(own)!.reputation });
       const ru: RoundPlayerUpdate = update;
+      const plan = clubById.get(own)!.training;
+      if (plan) {
+        const t = applyTraining(plan, p, update, `${gameId}|s${season}|r${round}|training|${own}`);
+        ru.fitness = t.fitness;
+        ru.development_xp = t.development_xp;
+        if (t.injury) { ru.injured_matches = t.injury.matches; ru.injury_type = t.injury.type; }
+      }
       if (st && st.minutes > 0 && st.slot) {
         const fam = addFamiliarity(p.familiarity, st.slot, st.minutes);
         ru.position_familiarity = fam;

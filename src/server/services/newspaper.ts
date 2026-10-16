@@ -84,7 +84,17 @@ export async function loadRoundFacts(c: PoolClient, gameId: string, season: numb
         .map((x) => ({ club_id: x.club_id, player: x.player, minute: x.minute })),
     };
   });
+  const pc = await c.query<{ club_id: string; opponent_club_id: string | null; questions: { key: string; text: string }[]; answers: { key: string; tone: string; text: string }[] }>(
+    `select club_id, opponent_club_id, questions, answers from public.press_conferences
+      where game_id = $1 and season = $2 and round = $3 and answered_at is not null order by club_id`, [gameId, season, round]);
+  const press = pc.rows.map((r) => ({
+    club_id: r.club_id, opponent_id: r.opponent_club_id,
+    answers: (r.answers ?? []).map((a) => ({
+      question: r.questions.find((q) => q.key === a.key)?.text ?? "", tone: a.tone as "confident", text: String(a.text ?? ""),
+    })),
+  }));
   return {
+    ...(press.length ? { press } : {}),
     game_id: gameId, season, round, total_rounds: se.rows[0].total_rounds,
     clubs: clubs.rows.map((r) => ({ id: r.id, name: r.name_snapshot, short: r.short_name, strength: Number(r.strength), manager: r.display_name ?? null })),
     matches,

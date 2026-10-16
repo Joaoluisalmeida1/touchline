@@ -34,6 +34,8 @@ interface OnPitch {
   minIn: number;
   minOut: number | null;
   stats: PlayerMatchStats;
+  /** tightly marked by the opponent (plays at MARKED_FACTOR) */
+  marked?: boolean;
 }
 
 interface Team {
@@ -108,6 +110,10 @@ function buildTeam(input: MatchTeamInput, side: Side, dayForm: number): Team {
 
 const onPitch = (t: Team): OnPitch[] => t.players.filter((p) => p.onPitch);
 
+/** Tight marking: a marked player plays at 94%; each marker costs the marking side 0.5 control. */
+const MARKED_FACTOR = 0.94;
+const MARKING_CONTROL_COST = 0.5;
+
 /** Effective rating of a player right now (bounded modifiers, no double counting with profiles). */
 function eff(p: OnPitch): number {
   const suit = slotFit(p.input, p.slot);
@@ -115,7 +121,7 @@ function eff(p: OnPitch): number {
   const formF = 1 + C.formEffect * clamp(p.input.form, -3, 3) / 3;
   const moraleF = 1 + C.moraleEffect * clamp((p.input.morale - 60) / 40, -1, 1);
   const sharpF = 0.97 + 0.03 * clamp(p.input.sharpness, 0, 100) / 100;
-  return p.input.ovr * suit * staminaF * formF * moraleF * sharpF;
+  return p.input.ovr * suit * staminaF * formF * moraleF * sharpF * (p.marked ? MARKED_FACTOR : 1);
 }
 
 function weightedUnit(players: OnPitch[], lineWeights: Record<PositionGroup, number>, key: keyof PlayerProfile): number {
@@ -158,10 +164,14 @@ function computeUnits(t: Team): Units {
   const capId = t.input.instructions?.captain;
   const cap = capId ? ps.find((p) => p.input.id === capId) : undefined;
   const lead = cap ? C.captainBase + C.captainPerPoint * clamp(cap.input.ovr - 70, -10, 15) : 0;
+  // training focus / press effects / marking cost (all absent => exactly 0)
+  const m = t.input.modifiers;
+  const mc = (m?.control ?? 0) - MARKING_CONTROL_COST * Math.min(2, t.input.marking?.length ?? 0);
+  const ma = m?.attack ?? 0, md = m?.defense ?? 0;
   return {
-    control: (weightedUnit(ps, { GK: 0.1, DEF: 0.35, MID: 1, ATT: 0.35 }, "creation") + d + sMid + rc + lead) * numbers,
-    attack: (weightedUnit(ps, { GK: 0, DEF: 0.15, MID: 0.55, ATT: 1 }, "attack") + d + sAtt + ra + lead) * numbers,
-    defense: (weightedUnit(ps, { GK: 0.25, DEF: 1, MID: 0.45, ATT: 0.1 }, "defense") + d + sDef + rd + lead) * numbers,
+    control: (weightedUnit(ps, { GK: 0.1, DEF: 0.35, MID: 1, ATT: 0.35 }, "creation") + d + sMid + rc + lead + mc) * numbers,
+    attack: (weightedUnit(ps, { GK: 0, DEF: 0.15, MID: 0.55, ATT: 1 }, "attack") + d + sAtt + ra + lead + ma) * numbers,
+    defense: (weightedUnit(ps, { GK: 0.25, DEF: 1, MID: 0.45, ATT: 0.1 }, "defense") + d + sDef + rd + lead + md) * numbers,
     keeper: gk ? eff(gk) + d * 0.5 : 30,
     n,
   };
@@ -182,6 +192,15 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
   const away = buildTeam(input.away, "away", clamp(rng.normal(0, C.matchDayNoiseSd), -6, 6));
   const teams: Record<Side, Team> = { home, away };
   const other = (s: Side): Side => (s === "home" ? "away" : "home");
+  // tight marking: flag the opponent's marked players, then refresh both teams' units
+  for (const t of [home, away]) {
+    const ids = new Set((t.input.marking ?? []).slice(0, 2));
+    if (!ids.size) continue;
+    const opp = t === home ? away : home;
+    for (const p of opp.players) if (ids.has(p.input.id)) p.marked = true;
+    opp.units = computeUnits(opp);
+  }
+  const plansFired: NonNullable<MatchResult["plans_fired"]> = [];
   const events: MatchEvent[] = [];
   const momentum: number[] = new Array(20).fill(0);
   let seq = 0;
@@ -639,6 +658,35 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     shoot(att, def, kind);
   };
 
+  // ---------- match plan (conditional instructions) ----------
+  const fired = new Set<string>();
+  const applyPlans = (t: Team) => {
+    const rules = t.input.plans;
+    if (!rules?.length) return;
+    const minute = minuteOf(clock);
+    const diff = t.goals - teams[other(t.side)].goals;
+    rules.slice(0, 3).forEach((r, i) => {
+      const k = `${t.side}:${i}`;
+      if (fired.has(k) || minute < r.minute) return;
+      const ok = r.when === "losing" ? diff < 0 : r.when === "winning" ? diff > 0 : diff === 0;
+      if (!ok) return;
+      fired.add(k);
+      if (r.mentality) {
+        t.tactics = { ...t.tactics, mentality: r.mentality };
+      }
+      let subMade = false;
+      if (r.sub && t.subsUsed < C.maxSubs) {
+        const out = onPitch(t).find((p) => p.input.id === r.sub!.out);
+        const inn = t.bench.find((b) => !b.wasOnPitch && b.input.id === r.sub!.in);
+        if (out && inn && (out.slot === "GK") === (inn.input.position_group === "GK")) {
+          doSub(t, out, inn, out.slot, "plan");
+          subMade = true;
+        }
+      }
+      plansFired.push({ side: t.side, rule: i, minute, sub_made: subMade });
+    });
+  };
+
   // ---------- main loop ----------
   const endOfMatch = () => 90 * 60 + (secondHalfStoppageBase + extraSecondHalf) * 60;
   while (true) {
@@ -665,6 +713,8 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
       lastStaminaTick = clock;
     }
     if (half === 2) {
+      applyPlans(home);
+      applyPlans(away);
       maybeSubs(home);
       maybeSubs(away);
     }
@@ -717,6 +767,7 @@ export function simulateMatch(input: MatchInput, seed: string): MatchResult {
     player_stats: allStats,
     momentum: momentum.map((m) => Math.round(m * 100) / 100),
     duration_seconds: endClock,
+    ...(plansFired.length ? { plans_fired: plansFired } : {}),
   };
 }
 
