@@ -18,7 +18,7 @@ const TITLE: Record<string, string> = {
   matchday_completed: "Jornada concluída", offer_received: "Nova proposta", offer_rejected: "Proposta recusada",
   transfer_completed: "Transferência", member_joined: "Novo treinador", game_started: "A liga começou", season_completed: "Fim de época",
   week_ready: "Semana de jornada",
-  board_warning: "Direção", offer_countered: "Contraproposta", achievement: "Conquista", board_ultimatum: "Direção", board_praise: "Direção",
+  board_warning: "Direção", offer_countered: "Contraproposta", achievement: "Conquista", cup_winner: "Taça", academy_intake: "Academia", contracts_expired: "Contratos", board_ultimatum: "Direção", board_praise: "Direção",
 };
 
 /** Sends every not-yet-pushed notification of the last day to its user's devices, then marks it pushed. */

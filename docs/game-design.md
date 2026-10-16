@@ -12,7 +12,8 @@ Princípios: assíncrono (5–10 min/dia no telemóvel), poucas decisões com ef
 | 2 · Semana de jornada | `feat/phase-2-matchday-week` | Gabinete (eventos aleatórios com escolhas), treino semanal, conferências de imprensa (texto livre + tom), relatório do adversário, instruções de marcação, planos de jogo condicionais, idades reais (Wikidata), traços de personalidade | **Implementado** |
 | 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | **Implementado** |
 | 4a · Rivais e balneário | `feat/phase-4a-rivals-social` | Negociações entre humanos (contrapropostas, trocas + dinheiro, notas), mural da liga (Balneário) com reações e publicações automáticas, conquistas e perfis de treinador | **Implementado** |
-| 4b · Taças e carreira | `feat/phase-4b-cups-careers` | Taça a eliminar, academia (jovens gerados), renovações e Bosman, empréstimos, subidas/descidas (ligas com duas divisões) | Planeado |
+| 4b · Taças e carreira | `feat/phase-4b-cups-careers` | Taça a eliminar, academia (jovens gerados), renovações de contrato e saídas a custo zero (jogadores livres) | **Implementado** |
+| 5 · Divisões e empréstimos | `feat/phase-5-divisions` | Ligas com duas divisões e subidas/descidas, empréstimos (com divisão de salário e opção de compra), cláusulas de revenda, pré-época guiada | Planeado |
 
 Cada fase termina com um *gate*: 4 jornadas jogadas com amigos; fica o que for usado.
 
@@ -55,6 +56,13 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 - **Balneário** (`/g/[id]/social`): mural da liga com mensagens até 280 caracteres (20/dia por treinador), 5 reações, apagar pelo autor ou pelo dono da liga. Publicações automáticas: transferências que envolvem um treinador humano, conquistas desbloqueadas e a manchete d'O Apito de cada jornada.
 - **Conquistas** (achievements-v1, 28): séries (invicto 5/10, vitórias 3/5, 3 jogos sem sofrer), goleadas, festival de golos, reviravoltas, golos tardios, hat-tricks, equipa da jornada, dérbis contra treinadores, liderança, títulos, objetivo da direção, mercado (contratação ≥ €20M, vender pelo dobro, trocas, negócios entre amigos), adeptos, direção, obras, imprensa, Gabinete e saldo. Avaliadas depois de cada jornada (e na primeira visita ao Balneário), com notificação e publicação no mural.
 - **Treinadores**: cartão por treinador humano com V-E-D, golos, % de vitórias, títulos, conquistas recentes e o confronto direto contigo.
+
+## Fase 4b — o que existe
+
+- **Taça da Liga dos Amigos** (`/g/[id]/cup`, cup-v1): eliminatórias a uma mão com todos os clubes, quadro por força (os mais fortes ficam isentos quando o número de clubes não é potência de 2). As rondas jogam-se logo a seguir a jornadas do campeonato espalhadas pela época (ex.: 18 clubes → 5 rondas após as jornadas 6, 11, 17, 23 e 28 de 34). Empate → penáltis (5 + morte súbita; qualidade do marcador e do guarda-redes por OVR; sem prolongamento na v1). Usa a escalação guardada; os jogos da taça cansam (condição por minutos) e podem lesionar, mas não contam para estatísticas da liga nem castigos. Prémios: €1M/€0,6M/€0,4M por eliminatória ganha nas rondas finais, €4M ao vencedor e €2M ao finalista. O vencedor é anunciado no mural e conta para a conquista "Taça no museu".
+- **Academia** (career-v1, separador Formação do Clube): depois de ~2/3 da época, cada clube recebe 3–6 jovens fictícios (16–18 anos, OVR 40–66, potencial por banda), mais e melhores com coordenador da formação de nível alto. Promover = contrato de 3 épocas na equipa principal; dispensar = sai. A IA promove o melhor se tiver espaço e dispensa os restantes no fim da época. Conquista "Prata da casa".
+- **Contratos** (separador Contratos): jogadores no último ano pedem um salário para renovar (1–3 épocas; mais caro se a moral estiver baixa ou forem ambiciosos, mais barato se leais; ≥ 33 anos só 1 época). Jogadores muito descontentes recusam renovar. Na mudança de época, quem não renovou num clube humano **sai a custo zero** (nunca abaixo do plantel mínimo); os clubes da IA continuam a renovar automaticamente.
+- **Jogadores livres** (Mercado): podem ser contratados por qualquer treinador sem custo de transferência, ao salário pedido, até à 3.ª jornada; depois a IA fica com os restantes, cada um no clube que mais precisa daquela posição.
 
 ## Próximas fases — regras de desenho já acordadas
 

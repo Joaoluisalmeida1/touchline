@@ -10,6 +10,9 @@ export function notificationText(type: string, p: Record<string, unknown>): stri
       ? `Proposta de ${p.buyer} por ${p.player}: ${p.swap} + ${eur(p.amount_cents)}.`
       : `Proposta de ${p.buyer} por ${p.player}: ${eur(p.amount_cents)}.`;
     case "offer_countered": return `Contraproposta por ${p.player}: pedem ${eur(p.amount_cents)}.`;
+    case "cup_winner": return `${p.club} conquista a Taça da Liga dos Amigos!`;
+    case "academy_intake": return `A academia tem ${p.count} novos jovens à espera de decisão.`;
+    case "contracts_expired": return `${p.count} ${Number(p.count) === 1 ? "jogador saiu" : "jogadores saíram"} em fim de contrato.`;
     case "achievement": return `Conquista desbloqueada: ${p.title}.`;
     case "offer_rejected": return "Uma proposta tua foi recusada.";
     case "transfer_completed": return `${p.direction === "in" ? "Contrataste" : "Vendeste"} ${p.player} por ${eur(p.amount_cents)}.`;

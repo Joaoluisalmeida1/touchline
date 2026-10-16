@@ -15,6 +15,7 @@ async function signup(page: Page, u: typeof ana) {
 }
 
 test("two friends play a matchday end to end", async ({ browser }) => {
+  test.setTimeout(180_000);
   const anaCtx = await browser.newContext();
   const ruiCtx = await browser.newContext();
   const a = await anaCtx.newPage();
@@ -127,6 +128,13 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   // Ana processes matchday 1
   await a.getByRole("button", { name: /Jogar jornada 1/ }).click();
   await expect(a.getByText("Jornada 1 concluída.", { exact: true })).toBeVisible({ timeout: 30_000 });
+
+  // the cup bracket exists from the start of the season; contracts and academy live in the Clube page
+  await r.goto(`${gameUrl}/cup`);
+  await expect(r.getByRole("heading", { name: "Taça da Liga dos Amigos" })).toBeVisible();
+  await r.screenshot({ path: "test-results/cup-desktop.png", fullPage: true });
+  await r.goto(`${gameUrl}/club?tab=contratos`);
+  await expect(r.getByText(/último ano de contrato/)).toBeVisible();
 
   // the Balneário: the round's headline was auto-posted; Rui posts and reacts
   await r.goto(`${gameUrl}/social`);

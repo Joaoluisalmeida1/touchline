@@ -10,10 +10,12 @@ export function SectionTabs<K extends string>({ label, tabs, panels, initial }: 
   const [tab, setTab] = useState<K>(initial);
   return (
     <div className="space-y-5">
-      <PillTabs label={label} value={tab} onChange={setTab} stretch tabs={tabs.map((t) => ({
+      <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <PillTabs label={label} value={tab} onChange={setTab} stretch className="min-w-max sm:min-w-0" tabs={tabs.map((t) => ({
         id: t.id,
         label: <>{t.label}{t.badge ? <span className="ml-1 inline-flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-extrabold text-accent-ink">{t.badge}</span> : null}</>,
       }))} />
+      </div>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={tab} initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
           {panels[tab]}
