@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeftRight, CalendarDays, ClipboardList, Ellipsis, Landmark, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Wallet, X } from "lucide-react";
+import { ArrowLeftRight, CalendarDays, ClipboardList, Ellipsis, Landmark, MessagesSquare, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Wallet, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,6 +21,7 @@ function useItems(gameId: string, isOwner: boolean) {
     { key: "/table", label: "Classificação", short: "Tabela", icon: <ListOrdered className={ICON} /> },
     { key: "/market", label: "Mercado", short: "Mercado", icon: <ArrowLeftRight className={ICON} /> },
     { key: "/finances", label: "Finanças", short: "Finanças", icon: <Wallet className={ICON} /> },
+    { key: "/social", label: "Balneário", short: "Balneário", icon: <MessagesSquare className={ICON} /> },
     { key: "/history", label: "História", short: "História", icon: <ScrollText className={ICON} /> },
     { key: "/settings", label: isOwner ? "Definições" : "Liga", short: isOwner ? "Definições" : "Liga", icon: <Settings2 className={ICON} /> },
   ].map((i) => ({ ...i, href: base + i.key }));

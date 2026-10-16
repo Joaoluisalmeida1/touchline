@@ -266,12 +266,21 @@ export async function getExternalPlayer(userId: string, gameId: string, sourcePl
 
 export async function getOffers(userId: string, gameId: string) {
   return withUser(userId, async (c) => (await c.query(
-    `select o.id, o.status, o.amount_cents, o.counter_amount_cents, o.response_reason, o.created_at, o.expires_at,
+    `select o.id, o.status, o.amount_cents, o.counter_amount_cents, o.response_reason, o.created_at, o.expires_at, o.responded_at,
             o.buyer_club_id, o.seller_club_id, p.id as player_id, p.name_snapshot as player_name, p.current_ovr, p.position_group,
-            b.name_snapshot as buyer_name, s.name_snapshot as seller_name, b.manager_user_id = $2 as i_am_buyer
+            b.name_snapshot as buyer_name, s.name_snapshot as seller_name, b.manager_user_id = $2 as i_am_buyer,
+            s.manager_user_id is not null as seller_human, o.message, o.counter_message, o.parent_offer_id,
+            sw.name_snapshot as swap_name, sw.id as swap_player_id,
+            exists (select 1 from transfer_offers c where c.parent_offer_id = o.id) as has_reply
        from transfer_offers o join game_players p on p.id = o.player_id
+       left join game_players sw on sw.id = o.swap_player_id
        join game_clubs b on b.id = o.buyer_club_id join game_clubs s on s.id = o.seller_club_id
       where o.game_id = $1 order by (o.status = 'pending') desc, o.created_at desc limit 50`, [gameId, userId])).rows);
+}
+
+export async function getMySquadLight(userId: string, clubId: string) {
+  return withUser(userId, async (c) => (await c.query<{ id: string; name: string; ovr: number; position_group: string }>(
+    `select id, name_snapshot name, current_ovr ovr, position_group from game_players where club_id = $1 order by current_ovr desc`, [clubId])).rows);
 }
 
 export async function getRecentTransfers(userId: string, gameId: string) {

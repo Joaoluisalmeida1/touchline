@@ -4,7 +4,8 @@ import { ActionForm } from "@/components/action-form";
 import { ExternalOfferForm } from "@/components/external-offer-form";
 import { PlayerAvatar } from "@/components/squad/avatar";
 import { Badge, Card, CardTitle, Empty, FormArrow, OvrBadge, PosPill, cn, eur, inputCls } from "@/components/ui";
-import { cancelOfferAction, respondOfferAction } from "@/server/actions";
+import { acceptCounterAction, cancelOfferAction, counterOfferAction, respondOfferAction } from "@/server/actions";
+import { randomUUID } from "node:crypto";
 import { requireUser } from "@/server/auth";
 import { getExternalPlayer, getGame, getMarketLeagues, getOffers, getRecentTransfers, searchMarket } from "@/server/queries";
 
@@ -12,7 +13,7 @@ export const metadata = { title: "Mercado" };
 
 type SP = { pos?: string; min?: string; max?: string; price?: string; q?: string; listed?: string; page?: string; league?: string; scout?: string };
 const UUID = /^[0-9a-f-]{36}$/;
-const STATUS: Record<string, string> = { pending: "Pendente", accepted: "Aceite", rejected: "Recusada", cancelled: "Cancelada", expired: "Expirada", superseded: "Ultrapassada" };
+const STATUS: Record<string, string> = { pending: "Pendente", accepted: "Aceite", rejected: "Recusada", cancelled: "Cancelada", expired: "Expirada", superseded: "Ultrapassada", countered: "Contraproposta" };
 
 export default async function Market({ params, searchParams }: { params: Promise<{ gameId: string }>; searchParams: Promise<SP> }) {
   const { gameId } = await params;
@@ -160,17 +161,37 @@ export default async function Market({ params, searchParams }: { params: Promise
                     <Badge tone={o.status === "pending" ? "info" : o.status === "accepted" ? "accent" : "default"} dot={o.status === "pending"}>{STATUS[o.status] ?? o.status}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    {o.i_am_buyer ? `Para ${o.seller_name}` : `De ${o.buyer_name}`} · <b className="font-display text-sm text-ink">{eur(o.amount_cents)}</b>
-                    {o.counter_amount_cents ? <> · pedem <b className="font-display text-sm text-warn">{eur(o.counter_amount_cents)}</b></> : ""}
+                    {o.i_am_buyer ? `Para ${o.seller_name}` : `De ${o.buyer_name}`} · {o.swap_name ? <><b className="text-ink">{o.swap_name}</b> + </> : null}<b className="font-display text-sm text-ink">{eur(o.amount_cents)}</b>
+                    {o.counter_amount_cents ? <> · pedem <b className="font-display text-sm text-warn">{eur(o.counter_amount_cents)}</b>{o.swap_name ? " + a troca" : ""}</> : ""}
+                    {o.parent_offer_id ? <span className="ml-1 text-faint">· negociação</span> : null}
                   </p>
+                  {o.message && <p className="mt-1 text-xs italic text-muted">«{o.message}»</p>}
+                  {o.counter_message && <p className="mt-1 text-xs italic text-warn">«{o.counter_message}»</p>}
                   {o.status === "pending" && (o.i_am_buyer ? (
                     <ActionForm action={cancelOfferAction} hidden={{ gameId, offerId: o.id }} submitLabel="Cancelar" variant="ghost" inline className="mt-1" submitClassName="min-h-8 px-2 text-xs" />
                   ) : (
-                    <div className="mt-2 flex gap-2">
-                      <ActionForm action={respondOfferAction} hidden={{ gameId, offerId: o.id, accept: "true" }} submitLabel="Aceitar" inline submitClassName="min-h-9" confirm={`Vender ${o.player_name} por ${eur(o.amount_cents, false)}?`} />
-                      <ActionForm action={respondOfferAction} hidden={{ gameId, offerId: o.id, accept: "false" }} submitLabel="Recusar" variant="secondary" inline submitClassName="min-h-9" />
+                    <div className="mt-2 space-y-2">
+                      <div className="flex gap-2">
+                        <ActionForm action={respondOfferAction} hidden={{ gameId, offerId: o.id, accept: "true" }} submitLabel="Aceitar" inline submitClassName="min-h-9"
+                          confirm={o.swap_name ? `Trocar ${o.player_name} por ${o.swap_name} + ${eur(o.amount_cents, false)}?` : `Vender ${o.player_name} por ${eur(o.amount_cents, false)}?`} />
+                        <ActionForm action={respondOfferAction} hidden={{ gameId, offerId: o.id, accept: "false" }} submitLabel="Recusar" variant="secondary" inline submitClassName="min-h-9" />
+                      </div>
+                      <details className="group rounded-xl border border-line bg-surface/40 px-3 py-2">
+                        <summary className="cursor-pointer text-xs font-bold text-muted group-open:text-ink">Contrapropor</summary>
+                        <ActionForm action={counterOfferAction} hidden={{ gameId, offerId: o.id }} submitLabel="Enviar contraproposta" variant="secondary" className="mt-2 space-y-2" submitClassName="min-h-9 w-full">
+                          <input name="amountEur" inputMode="numeric" required defaultValue={Math.round(Number(o.amount_cents) / 100 * 1.25)} aria-label="Valor pedido (€)" className={cn(inputCls, "min-h-9 font-display font-bold tabular")} />
+                          <input name="message" maxLength={140} placeholder="Nota (opcional)" aria-label="Nota da contraproposta" className={cn(inputCls, "min-h-9")} />
+                        </ActionForm>
+                      </details>
                     </div>
                   ))}
+                  {o.status === "countered" && o.i_am_buyer && !o.has_reply && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <ActionForm action={acceptCounterAction} hidden={{ gameId, offerId: o.id, idempotencyKey: randomUUID() }} submitLabel="Aceitar contraproposta" inline submitClassName="min-h-9"
+                        confirm={`Pagar ${eur(o.counter_amount_cents, false)}${o.swap_name ? ` + ${o.swap_name}` : ""} por ${o.player_name}?`} />
+                      <Link href={`/g/${gameId}/players/${o.player_id}?parent=${o.id}`} className="inline-flex min-h-9 items-center rounded-xl border border-line-strong bg-surface-2 px-3 text-xs font-bold hover:border-faint">Nova proposta</Link>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

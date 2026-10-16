@@ -41,6 +41,7 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 5. Etapas pós-jogo (não fatais — uma falha é registada e a jornada fica processada):
    - `publishRound` (`services/newspaper.ts`): carrega os factos da jornada, corre `buildEdition` e grava `news_items`, `round_awards` e `game_events` com `on conflict do nothing` (idempotente). A página do jornal faz *back-fill* de jornadas sem edição (`ensureEditions`).
    - `afterRound` (`services/business.ts`): humor dos adeptos e confiança da direção (avisos, cortes/reforços de orçamento), uma vez por jornada (marca `business_round`).
+   - `afterRoundSocial` (`services/social.ts`): manchete da jornada no mural e avaliação de conquistas (marca `social_round`).
    - `prepareWeek` (`services/week.ts`): prepara a jornada seguinte — conferências de imprensa dos clubes humanos e assuntos do Gabinete para todos os clubes — uma só vez (marca `week_prepared`).
    - `flushPush` (`services/push.ts`): envia notificações ainda não enviadas por Web Push (no-op sem chaves VAPID) e marca `pushed_at`.
 6. Última jornada → `end_season`: prémios, rollover de jogadores, nova época e calendário.
@@ -66,6 +67,11 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 - Tabelas: `club_business` (humor, preço, lotação base, obras), `club_staff` + `staff_candidates`, `sponsor_offers` + `sponsor_deals`, `board_state` (objetivo, confiança, orçamentos, histórico). Estádio, staff e contratos assinados são públicos na liga; propostas, candidatos e direção só para o próprio clube.
 - Comandos: `set_ticket_price`, `start_upgrade`, `hire_staff`, `sign_sponsor`, `set_budget_shift`. `_apply_effects` ganhou `confidence`, `fan_mood`, `ticket_price`. Novos tipos no ledger: `staff_wages`, `infrastructure`.
 - Motor: `LeagueClub` ganhou `stadium`, `sponsors` e `staff` opcionais. Sem eles (ligas antigas antes da preparação, simulações offline) tudo funciona como economy-v1 e os testes *golden* não mudam. A assistência fica em `match_runs.result_json.attendance`. As cláusulas de fim de época entram no ledger de `end_season`.
+
+## Rivais e balneário (fase 4a)
+
+- `transfer_offers` ganhou `parent_offer_id` (negociação), `swap_player_id`, `message`, `counter_message` e o estado `countered`; o valor pode ser 0 quando há troca. `_execute_transfer` move os dois jogadores, anula propostas pendentes sobre ambos e publica no mural.
+- Tabelas: `wall_posts` (com `dedupe_key` para publicações automáticas idempotentes), `wall_reactions`, `achievements` (única por liga/treinador/conquista). Só leitura para membros; escrita apenas por comandos (`post_wall`, `react_wall`, `delete_wall_post`) ou pelo servidor.
 
 ## Segurança
 

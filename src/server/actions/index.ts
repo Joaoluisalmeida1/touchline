@@ -238,13 +238,17 @@ export async function autoNumberSquadAction(input: { gameId: string }): Promise<
 export async function createOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
   const gameId = uuid.parse(form.get("gameId"));
   const playerId = uuid.parse(form.get("playerId"));
-  const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(100_000, "Mínimo €100 000.").max(1_000_000_000)
+  const swap = uuid.safeParse(form.get("swapPlayerId"));
+  const parent = uuid.safeParse(form.get("parentOfferId"));
+  const message = z.string().trim().max(140, "Nota demasiado longa (máx. 140).").safeParse(String(form.get("message") ?? ""));
+  if (!message.success) return { error: message.error.issues[0].message };
+  const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(swap.success ? 0 : 100_000, "Mínimo €100 000.").max(1_000_000_000)
     .safeParse(String(form.get("amountEur") ?? "").replace(/[^\d]/g, ""));
   if (!amountEur.success) return { error: amountEur.error.issues[0].message };
   // idempotency key generated in the form (hidden input) so double-submits/replays cannot double-reserve
   const key = z.string().min(8).max(100).safeParse(form.get("idempotencyKey"));
-  const r = await userCommand(gameId, `select public.create_offer($1, $2, $3) as r`,
-    [playerId, amountEur.data * 100, key.success ? key.data : randomUUID()], "");
+  const r = await userCommand(gameId, `select public.make_offer($1, $2, $3, $4, $5, $6) as r`,
+    [playerId, amountEur.data * 100, key.success ? key.data : randomUUID(), swap.success ? swap.data : null, message.data || null, parent.success ? parent.data : null], "");
   if (!r.ok) return r;
   await pushNow();
   const res = (r.data?.r ?? {}) as { status: string; counter_amount_cents?: number; reason?: string };
@@ -260,7 +264,11 @@ export async function signExternalAction(_: ActionState, form: FormData): Promis
   const user = await requireUser();
   const gameId = uuid.parse(form.get("gameId"));
   const sourcePlayerId = uuid.parse(form.get("sourcePlayerId"));
-  const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(100_000, "Mínimo €100 000.").max(1_000_000_000)
+  const swap = uuid.safeParse(form.get("swapPlayerId"));
+  const parent = uuid.safeParse(form.get("parentOfferId"));
+  const message = z.string().trim().max(140, "Nota demasiado longa (máx. 140).").safeParse(String(form.get("message") ?? ""));
+  if (!message.success) return { error: message.error.issues[0].message };
+  const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(swap.success ? 0 : 100_000, "Mínimo €100 000.").max(1_000_000_000)
     .safeParse(String(form.get("amountEur") ?? "").replace(/[^\d]/g, ""));
   if (!amountEur.success) return { error: amountEur.error.issues[0].message };
   let res;
@@ -461,6 +469,60 @@ export async function setBudgetShiftAction(_: ActionState, form: FormData): Prom
     const gameId = uuid.parse(form.get("gameId"));
     const shift = z.coerce.number().int().min(-20, "Só podes mover até 20%.").max(20, "Só podes mover até 20%.").parse(form.get("shift"));
     return userCommand(gameId, `select public.set_budget_shift($1, $2)`, [gameId, shift], "Orçamento ajustado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/* ------------------------------- negotiations + wall (phase 4a) ------------------------------- */
+export async function counterOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const amountEur = z.coerce.number().int("Valor em euros inteiros.").min(0).max(1_000_000_000).parse(String(form.get("amountEur") ?? "").replace(/[^\d]/g, ""));
+    const message = z.string().trim().max(140, "Nota demasiado longa (máx. 140).").parse(String(form.get("message") ?? ""));
+    const r = await userCommand(gameId, `select public.counter_offer($1, $2, $3) as r`, [uuid.parse(form.get("offerId")), amountEur * 100, message || null], "Contraproposta enviada.");
+    await pushNow();
+    return r;
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function acceptCounterAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const key = z.string().min(8).max(100).safeParse(form.get("idempotencyKey"));
+    const r = await userCommand(gameId, `select public.accept_counter($1, $2) as r`, [uuid.parse(form.get("offerId")), key.success ? key.data : randomUUID()], "Negócio fechado!");
+    await pushNow();
+    return r;
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function postWallAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const body = z.string().trim().min(1, "Escreve alguma coisa.").max(280, "Máximo de 280 caracteres.").parse(String(form.get("body") ?? ""));
+    return userCommand(gameId, `select public.post_wall($1, $2)`, [gameId, body], "Publicado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function reactWallAction(input: { gameId: string; postId: string; emoji: string }): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(input.gameId);
+    return userCommand(gameId, `select public.react_wall($1, $2) as r`, [uuid.parse(input.postId), z.enum(["👏", "🔥", "😂", "😬", "🤝"]).parse(input.emoji)], "");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteWallPostAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.delete_wall_post($1)`, [uuid.parse(form.get("postId"))], "Apagado.");
   } catch (e) {
     return fail(e);
   }

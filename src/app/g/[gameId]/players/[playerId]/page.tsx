@@ -11,19 +11,20 @@ import { OvrChart } from "@/components/ovr-chart";
 import { PlayerAvatar } from "@/components/squad/avatar";
 import { listPlayerAction, unlistPlayerAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
-import { getGame, getPlayer } from "@/server/queries";
+import { getGame, getMySquadLight, getPlayer } from "@/server/queries";
 
 const GROUP_NAME: Record<string, string> = { GK: "Guarda-redes", DEF: "Defesa", MID: "Médio", ATT: "Avançado" };
 
-export default async function PlayerPage({ params, searchParams }: { params: Promise<{ gameId: string; playerId: string }>; searchParams: Promise<{ toast?: string }> }) {
+export default async function PlayerPage({ params, searchParams }: { params: Promise<{ gameId: string; playerId: string }>; searchParams: Promise<{ toast?: string; parent?: string }> }) {
   const { gameId, playerId } = await params;
-  const { toast } = await searchParams;
+  const { toast, parent } = await searchParams;
   const user = await requireUser();
   const game = (await getGame(user.id, gameId))!;
   const data = await getPlayer(user.id, gameId, playerId);
   if (!data) notFound();
   const { player: p, log, matches, askingPrice, transfers } = data;
   const mine = p.club_id === game.my_club_id;
+  const mySquad = !mine && game.my_club_id && p.manager_user_id ? await getMySquadLight(user.id, game.my_club_id) : [];
   const st = p.season_stats_json ?? {};
   const points = [{ label: "Início", ovr: p.initial_ovr }, ...log.map((l) => ({ label: `E${l.season_number} J${l.round_number}`, ovr: l.new_ovr }))];
   const color = p.club_color ?? "#3b4450", color2 = p.club_color2 ?? "#ffffff";
@@ -137,7 +138,8 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
                 </ActionForm>
               )
             ) : game.my_club_id && p.club_id ? (
-              <OfferForm gameId={gameId} playerId={p.id} suggestedEur={Math.round(Number(askingPrice ?? p.market_value_cents) / 100)} aiClub={!p.manager_user_id} />
+              <OfferForm gameId={gameId} playerId={p.id} suggestedEur={Math.round(Number(askingPrice ?? p.market_value_cents) / 100)} aiClub={!p.manager_user_id}
+                mySquad={mySquad} parentOfferId={parent && /^[0-9a-f-]{36}$/.test(parent) ? parent : undefined} />
             ) : null}
           </div>
         </Card>

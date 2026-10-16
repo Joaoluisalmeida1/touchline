@@ -11,7 +11,8 @@ Princípios: assíncrono (5–10 min/dia no telemóvel), poucas decisões com ef
 | 1 · Liga viva | `feat/phase-1-living-league` | Registo de eventos, jornal O Apito, prémios da jornada, confronto direto e rivalidades, História (Hall of Fame), análise do jogo (xG), notificações push | **Implementado** |
 | 2 · Semana de jornada | `feat/phase-2-matchday-week` | Gabinete (eventos aleatórios com escolhas), treino semanal, conferências de imprensa (texto livre + tom), relatório do adversário, instruções de marcação, planos de jogo condicionais, idades reais (Wikidata), traços de personalidade | **Implementado** |
 | 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | **Implementado** |
-| 4 · Rivais e taças | `feat/phase-4-rivals-cups` | Negociações entre humanos (contrapropostas, trocas, empréstimos), taça a eliminar, mural da liga, conquistas, academia (jovens gerados), renovações e Bosman, subidas/descidas | Planeado |
+| 4a · Rivais e balneário | `feat/phase-4a-rivals-social` | Negociações entre humanos (contrapropostas, trocas + dinheiro, notas), mural da liga (Balneário) com reações e publicações automáticas, conquistas e perfis de treinador | **Implementado** |
+| 4b · Taças e carreira | `feat/phase-4b-cups-careers` | Taça a eliminar, academia (jovens gerados), renovações e Bosman, empréstimos, subidas/descidas (ligas com duas divisões) | Planeado |
 
 Cada fase termina com um *gate*: 4 jornadas jogadas com amigos; fica o que for usado.
 
@@ -47,6 +48,13 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 - **Direção** (0–100): objetivo pela força do plantel na liga (campeão / top N / evitar os últimos 3). Depois de cada jornada: pontos vs esperado (pela diferença de força e casa/fora, ±6), saldo negativo −2, salários acima do orçamento −1, transferências acima do orçamento −2. Abaixo de 35: aviso; abaixo de 20: ultimato e −25% no orçamento de transferências; a partir de 80: +10%. **Ninguém é despedido.** A nova época começa a meio caminho de 60, ±10 conforme o objetivo foi cumprido.
 - **Orçamentos**: transferências = 25–45% do saldo (conforme a confiança), salários = folha atual +5% por jornada; nas 3 primeiras jornadas o treinador pode mover até 20% entre os dois.
 - **Gabinete** (events-v2) ganhou 4 eventos: protesto contra o preço dos bilhetes, investidor (1×/época), campanha do patrocinador principal, presidente a exigir o dérbi entre treinadores. Novos efeitos: confiança, humor dos adeptos, preço dos bilhetes.
+
+## Fase 4a — o que existe
+
+- **Negociações** (só entre treinadores humanos; a IA continua a responder de imediato e só aceita dinheiro): a proposta pode incluir um jogador teu em **troca** (com troca, o dinheiro pode ser €0) e uma **nota** (≤ 140). Quem recebe pode **aceitar**, **recusar** ou **contrapropor** outro valor com nota. A contraproposta liberta a verba reservada; o comprador pode **aceitar a contraproposta** (o negócio fecha logo, porque o vendedor já concordou) ou fazer **nova proposta** na mesma negociação (máx. 6 rondas). Tudo validado em SQL (`make_offer`, `counter_offer`, `accept_counter`; `_execute_transfer` move também o jogador da troca).
+- **Balneário** (`/g/[id]/social`): mural da liga com mensagens até 280 caracteres (20/dia por treinador), 5 reações, apagar pelo autor ou pelo dono da liga. Publicações automáticas: transferências que envolvem um treinador humano, conquistas desbloqueadas e a manchete d'O Apito de cada jornada.
+- **Conquistas** (achievements-v1, 28): séries (invicto 5/10, vitórias 3/5, 3 jogos sem sofrer), goleadas, festival de golos, reviravoltas, golos tardios, hat-tricks, equipa da jornada, dérbis contra treinadores, liderança, títulos, objetivo da direção, mercado (contratação ≥ €20M, vender pelo dobro, trocas, negócios entre amigos), adeptos, direção, obras, imprensa, Gabinete e saldo. Avaliadas depois de cada jornada (e na primeira visita ao Balneário), com notificação e publicação no mural.
+- **Treinadores**: cartão por treinador humano com V-E-D, golos, % de vitórias, títulos, conquistas recentes e o confronto direto contigo.
 
 ## Próximas fases — regras de desenho já acordadas
 

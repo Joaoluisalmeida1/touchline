@@ -128,6 +128,19 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await a.getByRole("button", { name: /Jogar jornada 1/ }).click();
   await expect(a.getByText("Jornada 1 concluída.", { exact: true })).toBeVisible({ timeout: 30_000 });
 
+  // the Balneário: the round's headline was auto-posted; Rui posts and reacts
+  await r.goto(`${gameUrl}/social`);
+  await expect(r.getByText(/O Apito, J1/)).toBeVisible();
+  await r.getByLabel("Mensagem para o mural").fill("Primeira jornada feita. Ana, prepara-te!");
+  await r.getByRole("button", { name: "Publicar" }).click();
+  await expect(r.getByText("Primeira jornada feita. Ana, prepara-te!")).toBeVisible();
+  await r.getByRole("button", { name: "Reagir 🔥" }).first().click();
+  await r.getByRole("tab", { name: /^Conquistas/ }).click();
+  await expect(r.getByText(/conquistas nesta liga/)).toBeVisible();
+  await r.getByRole("tab", { name: /^Mural/ }).click();
+  await expect(r.getByLabel("Mensagem para o mural")).toBeVisible();
+  await r.screenshot({ path: "test-results/social-desktop.png", fullPage: true });
+
   // O Apito quotes Rui's press conference
   await r.goto(`${gameUrl}/news`);
   await expect(r.getByText(/Vamos jogar para ganhar, como sempre/).first()).toBeVisible();
