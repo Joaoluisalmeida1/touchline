@@ -6,7 +6,11 @@ export function notificationText(type: string, p: Record<string, unknown>): stri
     case "game_started": return `A liga começou: ${p.rounds} jornadas.`;
     case "matchday_completed": return `Jornada ${p.round} concluída.`;
     case "season_completed": return `Época ${p.season ?? ""} terminada.`;
-    case "offer_received": return `Proposta de ${p.buyer} por ${p.player}: ${eur(p.amount_cents)}.`;
+    case "offer_received": return p.swap
+      ? `Proposta de ${p.buyer} por ${p.player}: ${p.swap} + ${eur(p.amount_cents)}.`
+      : `Proposta de ${p.buyer} por ${p.player}: ${eur(p.amount_cents)}.`;
+    case "offer_countered": return `Contraproposta por ${p.player}: pedem ${eur(p.amount_cents)}.`;
+    case "achievement": return `Conquista desbloqueada: ${p.title}.`;
     case "offer_rejected": return "Uma proposta tua foi recusada.";
     case "transfer_completed": return `${p.direction === "in" ? "Contrataste" : "Vendeste"} ${p.player} por ${eur(p.amount_cents)}.`;
     case "week_ready": {

@@ -17,6 +17,7 @@ import { publishRound } from "./newspaper";
 import { flushPush } from "./push";
 import { prepareWeek } from "./week";
 import { afterRound, ensureBusiness, resolveSponsorDefaults, seasonClauses } from "./business";
+import { afterRoundSocial } from "./social";
 import { absRound, stadiumFrom, type StaffRole, type Upgrade } from "../../engine/economy/business";
 
 export interface MatchdayResult {
@@ -194,6 +195,11 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
       await afterRound(pool, gameId, season, round);
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "business.after_round_failed", ...ctx, round, error: (e as Error).message }));
+    }
+    try {
+      await afterRoundSocial(pool, gameId, season, round);
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "social.after_round_failed", ...ctx, round, error: (e as Error).message }));
     }
     if (!complete.season_complete) {
       try {

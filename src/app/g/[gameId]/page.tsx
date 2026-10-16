@@ -18,7 +18,7 @@ import { ensureWeek } from "@/server/services/week";
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
   member_joined: <UserPlus />, game_started: <Flag />, matchday_completed: <CalendarDays />, season_completed: <Trophy />,
-  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />, week_ready: <ClipboardList />, board_warning: <Landmark />, board_ultimatum: <Landmark />, board_praise: <Landmark />,
+  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />, week_ready: <ClipboardList />, board_warning: <Landmark />, board_ultimatum: <Landmark />, board_praise: <Landmark />, offer_countered: <ArrowLeftRight />, achievement: <Trophy />,
 };
 
 export default async function Overview({ params }: { params: Promise<{ gameId: string }> }) {

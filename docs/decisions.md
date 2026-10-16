@@ -76,3 +76,11 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 - **Calibração**: economy-v2 reproduz economy-v1 para um clube típico; as escolhas (bilhetes, patrocínios por objetivos, obras, staff) é que criam diferenças.
 - **Conteúdo gerado pelo servidor**: propostas de patrocínio e candidatos de staff são gerados por TS determinístico e guardados; o cliente só escolhe uma linha existente (mesmo padrão do Gabinete).
 - **Fora desta fase**: empréstimos com juros e embargo de transferências (ficam para quando houver negociações na fase 4).
+
+### Fase 4a (2026-10-16)
+
+- **Fase 4 dividida em 4a (rivais/social) e 4b (taças e carreira)** para entregar o que mais aumenta a interação entre amigos sem esperar pelas mudanças ao calendário (taça) e à estrutura da liga (subidas/descidas).
+- **Contrapropostas**: o vendedor fixa um valor; aceitar fecha o negócio de imediato (sem nova ronda de confirmação). A verba só fica reservada enquanto há uma proposta pendente, não durante a contraproposta.
+- **Trocas** só entre humanos; a IA continua com o fluxo de dinheiro imediato. Empréstimos, cláusulas de revenda e pagamentos a prestações ficam para a 4b (precisam de contratos e da janela de mercado).
+- **Mural** sem imagens e com limite diário; moderação = dono da liga apaga. Sem filtragem automática de texto (liga entre amigos).
+- **Conquistas por liga** (não globais) para respeitar o RLS por liga; um perfil global entre ligas fica para depois.
