@@ -13,6 +13,9 @@ export function notificationText(type: string, p: Record<string, unknown>): stri
       const parts = [p.press ? "conferência de imprensa" : "", Number(p.events) > 0 ? `${p.events} ${Number(p.events) === 1 ? "assunto" : "assuntos"} no Gabinete` : ""].filter(Boolean);
       return parts.length ? `Jornada ${p.round}: ${parts.join(" e ")} à tua espera.` : `Jornada ${p.round} a caminho.`;
     }
+    case "board_warning": return `Aviso da direção: a confiança caiu para ${p.confidence}.`;
+    case "board_ultimatum": return `Ultimato da direção (confiança ${p.confidence}): orçamento de transferências cortado.`;
+    case "board_praise": return `A direção está satisfeita (confiança ${p.confidence}): orçamento de transferências reforçado.`;
     default: return type;
   }
 }

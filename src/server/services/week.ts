@@ -8,6 +8,7 @@ import type { Pool } from "pg";
 import { rollEvents, type EvPlayer } from "../../engine/narrative/events";
 import { pressQuestions } from "../../engine/narrative/press";
 import { asService } from "../pg";
+import { ensureBusiness } from "./business";
 
 type R = "W" | "D" | "L";
 
@@ -89,11 +90,29 @@ export async function prepareWeek(pool: Pool, gameId: string, season: number, ro
           }
         }
       }
-      // Gabinete events (every club, same odds)
+      // Gabinete events (every club, same odds). Phase 3 context: stadium, board, main sponsor, derby, season history
+      const biz = new Map((await c.query<{ club_id: string; ticket_price: "low" | "normal" | "high"; fan_mood: number }>(
+        `select club_id, ticket_price, fan_mood from public.club_business where game_id = $1`, [gameId])).rows.map((r) => [r.club_id, r]));
+      const conf = new Map((await c.query<{ club_id: string; confidence: number }>(
+        `select club_id, confidence from public.board_state where game_id = $1 and season = $2`, [gameId, season])).rows.map((r) => [r.club_id, r.confidence]));
+      const mainSponsor = new Map((await c.query<{ club_id: string; brand: string }>(
+        `select club_id, brand from public.sponsor_deals where game_id = $1 and slot = 'main' and start_season <= $2 and end_season >= $2`, [gameId, season])).rows.map((r) => [r.club_id, r.brand]));
+      const seasonKeys = new Map<string, string[]>();
+      for (const r of (await c.query<{ club_id: string; key: string }>(`select club_id, key from public.inbox_events where game_id = $1 and season = $2`, [gameId, season])).rows) {
+        seasonKeys.set(r.club_id, [...(seasonKeys.get(r.club_id) ?? []), r.key]);
+      }
+      const oppOf = new Map<string, string>();
+      for (const f of fixtures) { oppOf.set(f.home_club_id, f.away_club_id); oppOf.set(f.away_club_id, f.home_club_id); }
       for (const club of clubs) {
+        const opp = oppOf.get(club.id) ? byId.get(oppOf.get(club.id)!) : undefined;
         const drafts = rollEvents({
           gameId, season, round, players: squad.get(club.id) ?? [],
-          club: { id: club.id, name: club.name_snapshot, reputation: club.reputation, last_results: last.get(club.id) ?? [], position: position.get(club.id) ?? null, clubs: clubs.length },
+          club: {
+            id: club.id, name: club.name_snapshot, reputation: club.reputation, last_results: last.get(club.id) ?? [], position: position.get(club.id) ?? null, clubs: clubs.length,
+            ticket_price: biz.get(club.id)?.ticket_price, fan_mood: biz.get(club.id)?.fan_mood, confidence: conf.get(club.id),
+            main_sponsor: mainSponsor.get(club.id) ?? null, next_opponent_human: club.manager_user_id && opp?.manager_user_id ? opp.name_snapshot : null,
+            season_keys: seasonKeys.get(club.id) ?? [],
+          },
         });
         for (const d of drafts) {
           const ins = await c.query(
@@ -127,5 +146,6 @@ export async function ensureWeek(pool: Pool, gameId: string): Promise<void> {
   const g = await asService(pool, async (c) => (await c.query<{ status: string; current_season: number; current_matchday: number }>(
     `select status, current_season, current_matchday from public.games where id = $1`, [gameId])).rows[0]);
   if (!g || g.status !== "active") return;
+  await ensureBusiness(pool, gameId);
   await prepareWeek(pool, gameId, g.current_season, g.current_matchday + 1);
 }

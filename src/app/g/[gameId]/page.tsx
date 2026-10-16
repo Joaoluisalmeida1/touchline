@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, ClipboardList, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, ClipboardList, Landmark, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Crest } from "@/components/crest";
 import { AnimatedNumber } from "@/components/fx/animated-number";
@@ -12,12 +12,13 @@ import { getClubs, getGame, getLastResult, getNextFixture, getNotifications, get
 import { notificationText } from "@/lib/notifications";
 import { getLatestHeadlines } from "@/server/league-queries";
 import { getWeekPending } from "@/server/week-queries";
+import { getBoardMini } from "@/server/club-queries";
 import { getPool } from "@/server/db";
 import { ensureWeek } from "@/server/services/week";
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
   member_joined: <UserPlus />, game_started: <Flag />, matchday_completed: <CalendarDays />, season_completed: <Trophy />,
-  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />, week_ready: <ClipboardList />,
+  offer_received: <ArrowLeftRight />, offer_rejected: <ArrowLeftRight />, transfer_completed: <ArrowLeftRight />, week_ready: <ClipboardList />, board_warning: <Landmark />, board_ultimatum: <Landmark />, board_praise: <Landmark />,
 };
 
 export default async function Overview({ params }: { params: Promise<{ gameId: string }> }) {
@@ -27,11 +28,12 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
   if (game.status === "active" && game.my_club_id) {
     await ensureWeek(getPool(), gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "week.ensure_failed", error: (e as Error).message })));
   }
-  const [clubs, standings, notifications, last, next, headlines, pending] = await Promise.all([
+  const [clubs, standings, notifications, last, next, headlines, pending, board] = await Promise.all([
     getClubs(user.id, gameId), getStandings(user.id, gameId).catch(() => []), getNotifications(user.id, gameId),
     getLastResult(user.id, gameId, game.my_club_id), game.my_club_id ? getNextFixture(user.id, gameId, game.my_club_id) : null,
     getLatestHeadlines(user.id, gameId, 3).catch(() => []),
     game.my_club_id && game.status === "active" ? getWeekPending(user.id, gameId, game.my_club_id).catch(() => null) : null,
+    game.my_club_id && game.status === "active" ? getBoardMini(user.id, gameId, game.my_club_id).catch(() => null) : null,
   ]);
   const myClub = clubs.find((c) => c.id === game.my_club_id);
   const unread = notifications.filter((n) => !n.read_at).length;
@@ -191,6 +193,19 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
                 {pending.events > 0 && <li className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-accent" />{pending.events} {pending.events === 1 ? "assunto" : "assuntos"} no Gabinete</li>}
               </ul>
               <ButtonLink href={`/g/${gameId}/week`} className="mt-4 w-full">Abrir a semana <ArrowRight className="size-4" /></ButtonLink>
+            </Card>
+          </StaggerItem>
+        )}
+        {board && (
+          <StaggerItem>
+            <Card>
+              <CardTitle icon={<Landmark />} action={<Link href={`/g/${gameId}/club`} className="flex items-center gap-1 text-xs font-semibold text-muted hover:text-accent">Clube <ArrowRight className="size-3" /></Link>}>Direção</CardTitle>
+              <div className="flex items-end justify-between gap-3">
+                <p className="font-display text-5xl font-extrabold leading-none tabular">{board.confidence}<span className="text-lg text-faint">/100</span></p>
+                {board.fan_mood !== null && <p className="text-right text-xs text-muted">Adeptos<br /><b className="font-display text-2xl text-ink tabular">{board.fan_mood}</b></p>}
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-line"><div className={cn("h-full rounded-full", board.confidence < 20 ? "bg-danger" : board.confidence < 35 ? "bg-warn" : "bg-accent")} style={{ width: `${board.confidence}%` }} /></div>
+              <p className="mt-3 text-sm text-muted">Objetivo: <b className="text-ink">{board.objective.label}</b></p>
             </Card>
           </StaggerItem>
         )}

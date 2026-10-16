@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeftRight, CalendarDays, ClipboardList, Ellipsis, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Wallet, X } from "lucide-react";
+import { ArrowLeftRight, CalendarDays, ClipboardList, Ellipsis, Landmark, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Wallet, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,6 +15,7 @@ function useItems(gameId: string, isOwner: boolean) {
     { key: "", label: "Resumo", short: "Resumo", icon: <House className={ICON} /> },
     { key: "/squad", label: "Plantel", short: "Plantel", icon: <Shirt className={ICON} /> },
     { key: "/week", label: "Semana", short: "Semana", icon: <ClipboardList className={ICON} /> },
+    { key: "/club", label: "Clube", short: "Clube", icon: <Landmark className={ICON} /> },
     { key: "/news", label: "Jornal", short: "Jornal", icon: <Newspaper className={ICON} /> },
     { key: "/fixtures", label: "Jogos", short: "Jogos", icon: <CalendarDays className={ICON} /> },
     { key: "/table", label: "Classificação", short: "Tabela", icon: <ListOrdered className={ICON} /> },

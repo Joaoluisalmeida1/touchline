@@ -105,6 +105,25 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await expect(r.getByText("Relatório do olheiro")).toBeVisible();
   await r.screenshot({ path: "test-results/week-scout-desktop.png", fullPage: true });
 
+  // Rui runs the club: signs a shirt sponsor, raises ticket prices, checks the board and staff
+  r.on("dialog", (d) => d.accept());
+  await r.goto(`${gameUrl}/club`);
+  await expect(r.getByRole("tab", { name: /^Patrocínios/ })).toHaveAttribute("aria-selected", "true");
+  await r.getByRole("button", { name: "Assinar" }).first().click();
+  await expect(r.getByText(/Até à época/).first()).toBeVisible();
+  await r.screenshot({ path: "test-results/club-sponsors-desktop.png", fullPage: true });
+  await r.getByRole("tab", { name: /^Estádio/ }).click();
+  await r.getByText("Alto", { exact: true }).click();
+  await r.getByRole("button", { name: "Guardar preço" }).click();
+  await expect(r.getByText("Preço dos bilhetes atualizado.")).toBeVisible();
+  await r.screenshot({ path: "test-results/club-stadium-desktop.png", fullPage: true });
+  await r.getByRole("tab", { name: /^Direção/ }).click();
+  await expect(r.getByText("Confiança da direção")).toBeVisible();
+  await r.screenshot({ path: "test-results/club-board-desktop.png", fullPage: true });
+  await r.getByRole("tab", { name: /^Staff/ }).click();
+  await expect(r.getByText("Preparador físico")).toBeVisible();
+  await r.screenshot({ path: "test-results/club-staff-desktop.png", fullPage: true });
+
   // Ana processes matchday 1
   await a.getByRole("button", { name: /Jogar jornada 1/ }).click();
   await expect(a.getByText("Jornada 1 concluída.", { exact: true })).toBeVisible({ timeout: 30_000 });
@@ -132,6 +151,8 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await expect(r.getByText(/Proposta aceite|Proposta enviada|Recusada/).first()).toBeVisible();
   await r.goto(`${gameUrl}/finances`);
   await expect(r.getByRole("columnheader", { name: "Saldo" })).toBeVisible();
+  await expect(r.getByText("Contas da época (blocos de 4 jornadas)")).toBeVisible();
+  await r.screenshot({ path: "test-results/finances-desktop.png", fullPage: true });
   await expect(r.getByText("Saldo inicial").first()).toBeVisible();
 
   // An outsider gets 404 for the league

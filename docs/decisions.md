@@ -68,3 +68,11 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 - **Prazo**: todos os assuntos expiram no início da jornada seguinte (sem prazos de vários dias nesta fase).
 - **Compatibilidade**: clubes sem plano de treino/jogo e sem conferência jogam exatamente como antes; os testes *golden* do motor não mudam.
 - **Wikidata**: corre no PC do operador (o ambiente de build não acede ao Wikidata). Só APIs oficiais (pesquisa + SPARQL), 1 pedido/1,1 s, User-Agent identificável (`WIKIDATA_CONTACT` opcional). Proveniência gravada em `source_players.attributes_json.birth_date`.
+
+### Fase 3 (2026-10-16)
+
+- **Despedimentos**: não existem. A confiança baixa tem custo real (corte de 25% no orçamento de transferências, avisos), mas todos os amigos continuam no jogo com o seu clube.
+- **Orçamentos suaves**: gastar acima do orçamento é permitido (o mercado não bloqueia); a direção penaliza a confiança. Evita mexer nos comandos de transferências e mantém a decisão do lado do treinador.
+- **Calibração**: economy-v2 reproduz economy-v1 para um clube típico; as escolhas (bilhetes, patrocínios por objetivos, obras, staff) é que criam diferenças.
+- **Conteúdo gerado pelo servidor**: propostas de patrocínio e candidatos de staff são gerados por TS determinístico e guardados; o cliente só escolhe uma linha existente (mesmo padrão do Gabinete).
+- **Fora desta fase**: empréstimos com juros e embargo de transferências (ficam para quando houver negociações na fase 4).

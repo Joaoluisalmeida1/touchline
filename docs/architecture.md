@@ -35,11 +35,12 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 ## Fluxo de uma jornada (exactly-once)
 
 1. `begin_matchday(game)` — `SELECT … FOR UPDATE` no jogo; adquire *lease* (240 s); fixa `processing_round`; escalações e mercado ficam bloqueados enquanto a lease está ativa.
-2. `resolve_due_events(game, round)` aplica a opção por omissão dos assuntos do Gabinete que expiram nesta jornada. TS carrega o estado (clubes, táticas, escalação guardada, plano de treino, plano de jogo, conferência de imprensa respondida, jogadores) e chama `processRound`: corrige escalações inválidas de forma determinística, simula cada jogo com `seed = game|época|jornada|fixture`, calcula `input_hash`, progressão e ledger.
+2. `ensureBusiness` (preparação da época, idempotente) e `resolveSponsorDefaults` (espaços de patrocínio sem escolha assinam a proposta fixa). `resolve_due_events(game, round)` aplica a opção por omissão dos assuntos do Gabinete que expiram nesta jornada. TS carrega o estado (clubes, táticas, escalação guardada, plano de treino, plano de jogo, conferência de imprensa respondida, jogadores) e chama `processRound`: corrige escalações inválidas de forma determinística, simula cada jogo com `seed = game|época|jornada|fixture`, calcula `input_hash`, progressão e ledger.
 3. `finalize_fixture(fixture, payload)` por jogo — lock da fixture; se já `completed` devolve `already_completed` sem efeitos. Valida golos vs eventos e lease. Grava run, eventos, stats, escalação usada, tabela, jogadores (com verificação de `version`), log de progressão e ledger (chaves idempotentes).
 4. `complete_matchday(game, round, payload)` — exige todos os jogos concluídos; aplica estado dos clubes com folga, salários/patrocínios, expira propostas; avança `current_matchday`; liberta a lease.
 5. Etapas pós-jogo (não fatais — uma falha é registada e a jornada fica processada):
    - `publishRound` (`services/newspaper.ts`): carrega os factos da jornada, corre `buildEdition` e grava `news_items`, `round_awards` e `game_events` com `on conflict do nothing` (idempotente). A página do jornal faz *back-fill* de jornadas sem edição (`ensureEditions`).
+   - `afterRound` (`services/business.ts`): humor dos adeptos e confiança da direção (avisos, cortes/reforços de orçamento), uma vez por jornada (marca `business_round`).
    - `prepareWeek` (`services/week.ts`): prepara a jornada seguinte — conferências de imprensa dos clubes humanos e assuntos do Gabinete para todos os clubes — uma só vez (marca `week_prepared`).
    - `flushPush` (`services/push.ts`): envia notificações ainda não enviadas por Web Push (no-op sem chaves VAPID) e marca `pushed_at`.
 6. Última jornada → `end_season`: prémios, rollover de jogadores, nova época e calendário.
@@ -59,6 +60,12 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 - Comandos do utilizador (SECURITY DEFINER, `auth.uid()`): `save_training_plan`, `save_match_plan`, `answer_press`, `answer_inbox_event`. O cliente só escolhe entre opções guardadas pelo servidor; os efeitos são aplicados por `_apply_effects` (interno, limitado, só `service_role`).
 - Motor: `MatchTeamInput` ganhou `modifiers` (controlo/ataque/defesa — treino + imprensa), `marking` e `plans`, todos opcionais; sem eles o resultado é bit a bit igual (hash *golden* inalterado).
 - Conteúdo como dados, versionado: `events-v1`, `press-v1`, `traits-v1`, `training-v1`.
+
+## Negócio do clube (fase 3)
+
+- Tabelas: `club_business` (humor, preço, lotação base, obras), `club_staff` + `staff_candidates`, `sponsor_offers` + `sponsor_deals`, `board_state` (objetivo, confiança, orçamentos, histórico). Estádio, staff e contratos assinados são públicos na liga; propostas, candidatos e direção só para o próprio clube.
+- Comandos: `set_ticket_price`, `start_upgrade`, `hire_staff`, `sign_sponsor`, `set_budget_shift`. `_apply_effects` ganhou `confidence`, `fan_mood`, `ticket_price`. Novos tipos no ledger: `staff_wages`, `infrastructure`.
+- Motor: `LeagueClub` ganhou `stadium`, `sponsors` e `staff` opcionais. Sem eles (ligas antigas antes da preparação, simulações offline) tudo funciona como economy-v1 e os testes *golden* não mudam. A assistência fica em `match_runs.result_json.attendance`. As cláusulas de fim de época entram no ledger de `end_season`.
 
 ## Segurança
 

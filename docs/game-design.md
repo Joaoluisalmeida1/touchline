@@ -10,7 +10,7 @@ Princípios: assíncrono (5–10 min/dia no telemóvel), poucas decisões com ef
 |---|---|---|---|
 | 1 · Liga viva | `feat/phase-1-living-league` | Registo de eventos, jornal O Apito, prémios da jornada, confronto direto e rivalidades, História (Hall of Fame), análise do jogo (xG), notificações push | **Implementado** |
 | 2 · Semana de jornada | `feat/phase-2-matchday-week` | Gabinete (eventos aleatórios com escolhas), treino semanal, conferências de imprensa (texto livre + tom), relatório do adversário, instruções de marcação, planos de jogo condicionais, idades reais (Wikidata), traços de personalidade | **Implementado** |
-| 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | Planeado |
+| 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | **Implementado** |
 | 4 · Rivais e taças | `feat/phase-4-rivals-cups` | Negociações entre humanos (contrapropostas, trocas, empréstimos), taça a eliminar, mural da liga, conquistas, academia (jovens gerados), renovações e Bosman, subidas/descidas | Planeado |
 
 Cada fase termina com um *gate*: 4 jornadas jogadas com amigos; fica o que for usado.
@@ -35,6 +35,18 @@ Tudo vive em **Semana** (`/g/[id]/week`, separadores Gabinete · Imprensa · Tre
 - **Plano de jogo**: até 3 regras para a 2.ª parte ("ao minuto 65, se estiver a perder → mentalidade ofensiva e/ou troca X por Y"), disparam uma vez; e até 2 marcações individuais (o marcado rende ×0,94; custa 0,5 de controlo por marcação). As regras disparadas ficam em `match_runs.result_json.plans_fired`.
 - **Relatório do adversário**: posição, golos e xG por jogo, sistema do último jogo, forma, historial, jogadores-chave (com traço), ausências, marcadores e a última frase do treinador rival na imprensa.
 - **Idades reais** (`npm run wikidata:ages`): datas de nascimento do Wikidata (CC0) para quem o fornecedor não deu. Ver `docs/operator-guide.md`.
+
+## Fase 3 — o que existe
+
+Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staff), cartão da Direção no Resumo e contas por blocos de 4 jornadas em Finanças. Regras em `src/engine/economy/business.ts` (business-v1 = economy-v2), calibradas para que um clube típico (reputação 60, adeptos a 50, bilhete normal, patrocinadores fixos) ganhe o mesmo que em economy-v1.
+
+- **Preparação da época** (`ensureBusiness`, uma vez por época): estádio (lotação base 6 000 + 4×reputação²), staff inicial (nível pela reputação), objetivo e orçamentos da direção, 3 candidatos por função de staff e 3 propostas de patrocínio por espaço. Clubes da IA assinam logo a proposta fixa.
+- **Patrocínios**: 4 espaços (principal 55%, estádio 20%, manga 15%, técnico 10% do patrocínio de economy-v1). Por espaço: **Fixo** (100% por jornada, 1–3 épocas), **Equilibrado** (80% + bónus por vitória, 2 épocas), **Por objetivos** (55% + bónus maior por vitória + bónus de fim de época se acabar no top do objetivo, 1 época). Marcas fictícias, sem apostas. Sem escolha até à jornada seguinte → assina a fixa.
+- **Estádio e bilhetes**: preço Baixo/Normal/Alto (×0,75/1/1,35) muda a assistência (+12%/0/−14%) e o humor dos adeptos (+1/0/−1 por jornada). Assistência = lotação × (0,55 + 0,35×humor + ajuste do preço + 5% contra clubes grandes). Humor: vitória +3, derrota −3, volta devagar a 50. Obras: bancada (+2 000 lugares, €3M, 6 jornadas, até 5) e camarotes (+€40k por jogo em casa, €2M, 8 jornadas, até 3), uma de cada vez.
+- **Staff** (salário por jornada, nível 1–5): adjunto (+3,75% evolução por nível acima de 1), preparador físico (+0,75 condição/jornada e −7,5% lesões no treino por nível), médico (−6,25% duração das lesões de jogo por nível), olheiro (nível 1: OVR do adversário em intervalo, sem sistema nem ausências; 2–3: sistema e ausências; 4+: também traços), coordenador da formação (prepara a academia da fase 4). Substituir alguém custa 2 jornadas do salário de quem sai.
+- **Direção** (0–100): objetivo pela força do plantel na liga (campeão / top N / evitar os últimos 3). Depois de cada jornada: pontos vs esperado (pela diferença de força e casa/fora, ±6), saldo negativo −2, salários acima do orçamento −1, transferências acima do orçamento −2. Abaixo de 35: aviso; abaixo de 20: ultimato e −25% no orçamento de transferências; a partir de 80: +10%. **Ninguém é despedido.** A nova época começa a meio caminho de 60, ±10 conforme o objetivo foi cumprido.
+- **Orçamentos**: transferências = 25–45% do saldo (conforme a confiança), salários = folha atual +5% por jornada; nas 3 primeiras jornadas o treinador pode mover até 20% entre os dois.
+- **Gabinete** (events-v2) ganhou 4 eventos: protesto contra o preço dos bilhetes, investidor (1×/época), campanha do patrocinador principal, presidente a exigir o dérbi entre treinadores. Novos efeitos: confiança, humor dos adeptos, preço dos bilhetes.
 
 ## Próximas fases — regras de desenho já acordadas
 

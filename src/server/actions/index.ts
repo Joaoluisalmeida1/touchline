@@ -416,3 +416,52 @@ export async function answerEventAction(_: ActionState, form: FormData): Promise
     return fail(e);
   }
 }
+
+/* ------------------------------- club business (phase 3) ------------------------------- */
+export async function setTicketPriceAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const level = z.enum(["low", "normal", "high"]).parse(form.get("level"));
+    return userCommand(gameId, `select public.set_ticket_price($1, $2)`, [gameId, level], "Preço dos bilhetes atualizado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function startUpgradeAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const kind = z.enum(["capacity", "vip"]).parse(form.get("kind"));
+    return userCommand(gameId, `select public.start_upgrade($1, $2) as r`, [gameId, kind], "Obra iniciada.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function hireStaffAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.hire_staff($1) as r`, [uuid.parse(form.get("candidateId"))], "Contratado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function signSponsorAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.sign_sponsor($1) as r`, [uuid.parse(form.get("offerId"))], "Contrato de patrocínio assinado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setBudgetShiftAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const shift = z.coerce.number().int().min(-20, "Só podes mover até 20%.").max(20, "Só podes mover até 20%.").parse(form.get("shift"));
+    return userCommand(gameId, `select public.set_budget_shift($1, $2)`, [gameId, shift], "Orçamento ajustado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
