@@ -110,7 +110,7 @@ export default async function WeekPage({ params, searchParams }: { params: Promi
             <MatchPlanEditor gameId={gameId} initialRules={(w.plan?.rules ?? []) as never} initialMarking={w.plan?.marking ?? []} mine={mine} theirs={theirs} opponent={report?.club.name_snapshot ?? null} />
           </div>
         ),
-        adversario: report ? <Scouting r={report} gameId={gameId} /> : <Empty title="Sem adversário" icon={<Telescope />}>Não há jogo marcado para a próxima jornada.</Empty>,
+        adversario: report ? <Scouting r={report} gameId={gameId} scout={w.scout} /> : <Empty title="Sem adversário" icon={<Telescope />}>Não há jogo marcado para a próxima jornada.</Empty>,
       }} />
     </div>
   );
@@ -182,7 +182,7 @@ function PressDone({ press }: { press: NonNullable<Awaited<ReturnType<typeof get
   );
 }
 
-function Scouting({ r, gameId }: { r: NonNullable<Awaited<ReturnType<typeof getOpponentReport>>>; gameId: string }) {
+function Scouting({ r, gameId, scout }: { r: NonNullable<Awaited<ReturnType<typeof getOpponentReport>>>; gameId: string; scout: number }) {
   const fit = r.players.filter((p) => !p.unavailable);
   const key = [...fit.filter((p) => p.position_group === "GK").slice(0, 1), ...fit.filter((p) => p.position_group !== "GK").slice(0, 5)]
     .sort((a, b) => b.current_ovr - a.current_ovr);
@@ -197,7 +197,7 @@ function Scouting({ r, gameId }: { r: NonNullable<Awaited<ReturnType<typeof getO
             <Stat label="Posição">{r.standing && r.played ? `${r.standing.position}.º` : "—"}</Stat>
             <Stat label="Golos / jogo" hint={`sofre ${r.avg.ga.toFixed(1)}`}>{r.avg.gf.toFixed(1)}</Stat>
             <Stat label="xG / jogo" hint={`concede ${r.avg.xga.toFixed(2)}`}>{r.avg.xgf.toFixed(2)}</Stat>
-            <Stat label="Sistema" hint="último jogo">{r.formation ?? "—"}</Stat>
+            <Stat label="Sistema" hint={scout >= 2 ? "último jogo" : "olheiro nível 2+"}>{scout >= 2 ? r.formation ?? "—" : "?"}</Stat>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-muted">Forma</span>{r.form ? <FormStrip form={r.form} /> : <span className="text-faint">sem jogos</span>}
@@ -205,16 +205,16 @@ function Scouting({ r, gameId }: { r: NonNullable<Awaited<ReturnType<typeof getO
           </div>
         </Card>
         <Card>
-          <CardTitle>Jogadores-chave</CardTitle>
+          <CardTitle action={<Badge>{`Olheiro nível ${scout}`}</Badge>}>Jogadores-chave</CardTitle>
           <ul className="divide-y divide-line">
             {key.map((p) => {
               const t = TRAIT_INFO[traitOf(p.id)];
               return (
                 <li key={p.id} className="flex items-center gap-3 py-2.5">
-                  <OvrBadge ovr={p.current_ovr} size="sm" />
+                  {scout >= 2 ? <OvrBadge ovr={p.current_ovr} size="sm" /> : <span className="w-14 text-center font-display text-sm font-bold tabular text-muted" title="Olheiro nível 1: estimativa">{p.current_ovr - 3}–{p.current_ovr + 3}</span>}
                   <PosPill group={p.position_group} label={p.position_detail ?? undefined} />
                   <Link href={`/g/${gameId}/players/${p.id}`} className="flex-1 truncate font-semibold hover:text-accent">{p.name}</Link>
-                  <span className="hidden text-xs text-faint sm:inline" title={t.hint}>{t.label}</span>
+                  {scout >= 4 && <span className="hidden text-xs text-faint sm:inline" title={t.hint}>{t.label}</span>}
                   <span className="w-16 text-right text-xs text-muted tabular">{p.goals}G {p.assists}A</span>
                 </li>
               );
@@ -225,7 +225,7 @@ function Scouting({ r, gameId }: { r: NonNullable<Awaited<ReturnType<typeof getO
       <div className="space-y-5">
         <Card>
           <CardTitle icon={<ShieldAlert />}>Ausências</CardTitle>
-          {out.length ? (
+          {scout < 2 ? <p className="text-sm text-muted">O teu olheiro não conseguiu apurar (nível 2+).</p> : out.length ? (
             <ul className="space-y-1.5 text-sm">{out.map((p) => <li key={p.id} className="flex justify-between gap-2"><span className="font-semibold">{p.name}</span><span className="text-xs text-danger">{p.injury_type ?? "Castigado"}</span></li>)}</ul>
           ) : <p className="text-sm text-muted">Plantel completo.</p>}
         </Card>

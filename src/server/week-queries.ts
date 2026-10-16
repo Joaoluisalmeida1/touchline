@@ -46,7 +46,9 @@ export async function getWeek(userId: string, gameId: string) {
     const mySquad = (await c.query<{ id: string; name_snapshot: string; position_group: string; current_ovr: number }>(
       `select id, name_snapshot, position_group, current_ovr from game_players where club_id = $1
         order by case position_group when 'GK' then 0 when 'DEF' then 1 when 'MID' then 2 else 3 end, current_ovr desc`, [club])).rows;
-    return { ...g, club, round, inbox, press, training, plan, fixture, mySquad };
+    // phase 3: the scout's level decides how much of the opponent report is visible (no scout row yet = full report)
+    const scout = (await c.query<{ level: number }>(`select level from club_staff where club_id = $1 and role = 'scout' and active`, [club])).rows[0]?.level ?? 5;
+    return { ...g, club, round, inbox, press, training, plan, fixture, mySquad, scout };
   });
 }
 

@@ -16,6 +16,8 @@ import { asService } from "../pg";
 import { publishRound } from "./newspaper";
 import { flushPush } from "./push";
 import { prepareWeek } from "./week";
+import { afterRound, ensureBusiness, resolveSponsorDefaults, seasonClauses } from "./business";
+import { absRound, stadiumFrom, type StaffRole, type Upgrade } from "../../engine/economy/business";
 
 export interface MatchdayResult {
   status: "processed" | "skipped";
@@ -41,6 +43,15 @@ export async function loadLeagueState(pool: Pool, gameId: string, at?: { season:
          left join public.training_plans tp on tp.club_id = gc.id
          left join public.match_plans mp on mp.club_id = gc.id
         where gc.game_id = $1 order by gc.id`, [gameId]);
+    const gs = (await c.query<{ current_season: number; current_matchday: number }>(`select current_season, current_matchday from public.games where id = $1`, [gameId])).rows[0];
+    const season = at?.season ?? gs.current_season;
+    const now = absRound(season, at?.round ?? gs.current_matchday);
+    const biz = new Map((await c.query<{ club_id: string; fan_mood: number; ticket_price: "low" | "normal" | "high"; base_capacity: number; upgrades: Upgrade[] }>(
+      `select club_id, fan_mood, ticket_price, base_capacity, upgrades from public.club_business where game_id = $1`, [gameId])).rows.map((r) => [r.club_id, r]));
+    const deals = (await c.query<{ id: string; club_id: string; base_cents: string; win_bonus_cents: string }>(
+      `select id, club_id, base_cents, win_bonus_cents from public.sponsor_deals where game_id = $1 and start_season <= $2 and end_season >= $2`, [gameId, season])).rows;
+    const staff = (await c.query<{ club_id: string; role: StaffRole; level: number; wage_cents: string }>(
+      `select club_id, role, level, wage_cents from public.club_staff where game_id = $1 and active`, [gameId])).rows;
     const press = new Map<string, { own_control?: number; opp_control?: number; calm?: boolean }>();
     if (at) {
       const pr = await c.query(
@@ -72,6 +83,16 @@ export async function loadLeagueState(pool: Pool, gameId: string, at?: { season:
       ...(Array.isArray(r.mp_marking) && r.mp_marking.length ? { marking: r.mp_marking as string[] } : {}),
       ...(Array.isArray(r.mp_rules) && r.mp_rules.length ? { plans: r.mp_rules as MatchPlanRule[] } : {}),
       ...(press.has(r.id) ? { press: press.get(r.id)! } : {}),
+      ...(biz.has(r.id) ? (() => {
+        const b = biz.get(r.id)!;
+        const st = stadiumFrom(b.base_capacity, b.upgrades ?? [], now);
+        return {
+          stadium: { capacity: st.capacity, vip_level: st.vip_level, fan_mood: b.fan_mood, ticket_price: b.ticket_price },
+          sponsors: deals.filter((d) => d.club_id === r.id).sort((a, b2) => (a.id < b2.id ? -1 : 1))
+            .map((d) => ({ id: d.id, base_cents: Number(d.base_cents), win_bonus_cents: Number(d.win_bonus_cents) })),
+          staff: Object.fromEntries(staff.filter((x) => x.club_id === r.id).map((x) => [x.role, { level: x.level, wage_cents: Number(x.wage_cents) }])),
+        };
+      })() : {}),
     }));
     const leaguePlayers: LeaguePlayer[] = players.rows.map((r) => ({
       id: r.id, version: r.version, club_id: r.club_id, name: r.name_snapshot, position_group: r.position_group,
@@ -112,6 +133,9 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     const done = fixtures.filter((f) => f.status === "completed");
     // Gabinete: events whose deadline is this round fall back to their default choice before the squads are read
     await asService(pool, (c) => c.query(`select public.resolve_due_events($1, $2)`, [gameId, round]));
+    // club business: season setup (first time / new season) and default sponsor signings for this round
+    await ensureBusiness(pool, gameId);
+    await resolveSponsorDefaults(pool, gameId, season, round);
     const state = await loadLeagueState(pool, gameId, { season, round });
     const outcome = processRound({
       gameId, season, round, clubs: state.clubs, players: state.players, fixtures: pending,
@@ -127,6 +151,7 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
           home_goals: fo.result.home_goals, away_goals: fo.result.away_goals, team_stats: fo.result.team_stats,
           momentum: fo.result.momentum, duration_seconds: Math.round(fo.result.duration_seconds),
           ...(fo.result.plans_fired ? { plans_fired: fo.result.plans_fired } : {}),
+          ...(fo.attendance ? { attendance: fo.attendance } : {}),
         },
         events: fo.result.events.map((e) => ({
           sequence_number: e.sequence_number, minute: e.minute, second: e.second, club_id: e.club_id, player_id: e.player_id,
@@ -165,6 +190,11 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "newspaper.failed", ...ctx, round, error: (e as Error).message }));
     }
+    try {
+      await afterRound(pool, gameId, season, round);
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "business.after_round_failed", ...ctx, round, error: (e as Error).message }));
+    }
     if (!complete.season_complete) {
       try {
         await prepareWeek(pool, gameId, season, round + 1);
@@ -199,9 +229,14 @@ export async function endSeason(pool: Pool, gameId: string) {
   });
   const state = await loadLeagueState(pool, gameId);
   const end = seasonEnd({ gameId, season, standings, clubs: state.clubs, players: state.players });
-  return asService(pool, async (c) => (await c.query(`select public.end_season($1, $2) as r`, [
-    gameId, JSON.stringify({ season_number: season, ledger: end.ledger, player_updates: end.player_updates, summary: end.summary }),
+  const table = (end.summary.table as { club_id: string }[]) ?? [];
+  const clauses = await seasonClauses(pool, gameId, season, table);
+  const r = await asService(pool, async (c) => (await c.query(`select public.end_season($1, $2) as r`, [
+    gameId, JSON.stringify({ season_number: season, ledger: [...end.ledger, ...clauses], player_updates: end.player_updates, summary: end.summary }),
   ])).rows[0].r);
+  // new season: board, budgets, staff pool and sponsor offers
+  await ensureBusiness(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "business.season_setup_failed", game_id: gameId, error: (e as Error).message })));
+  return r;
 }
 
 /** Cron entry: process games in daily mode whose deadline passed. Bounded batch per invocation. */

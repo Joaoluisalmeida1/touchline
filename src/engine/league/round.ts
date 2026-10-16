@@ -18,6 +18,7 @@ import {
 import { prizeMoneyCents } from "../economy/economy";
 import { applyTraining, planModifiers, type TrainingPlan } from "../training/training";
 import type { MatchPlanRule } from "../match/types";
+import { matchdayGate, staffAssistantXp, staffFitness, staffInjuryFactor, staffMedical, type Stadium, type StaffRole } from "../economy/business";
 
 export interface LeaguePlayer extends PlayerState {
   name: string;
@@ -46,6 +47,10 @@ export interface LeagueClub {
   plans?: MatchPlanRule[];
   /** answered press conference for this round */
   press?: { own_control?: number; opp_control?: number; calm?: boolean } | null;
+  /** phase 3 (business-v1): stadium, active sponsor deals and staff. Absent = economy-v1 behaviour. */
+  stadium?: Stadium | null;
+  sponsors?: { id: string; base_cents: number; win_bonus_cents: number }[] | null;
+  staff?: Partial<Record<StaffRole, { level: number; wage_cents: number }>> | null;
 }
 
 /** Unit modifiers for `club` against `opp`: training focus + own press confidence + opponent's mind games (unless calm). */
@@ -65,7 +70,7 @@ export interface RoundFixture {
 
 export interface LedgerEntry {
   club_id: string;
-  type: "gate_receipts" | "sponsorship" | "wages" | "result_bonus" | "prize_money";
+  type: "gate_receipts" | "sponsorship" | "wages" | "result_bonus" | "prize_money" | "staff_wages";
   amount_cents: number;
   key: string;
   reference?: string;
@@ -81,6 +86,8 @@ export interface FixtureOutcome {
   player_updates: RoundPlayerUpdate[];
   progression_logs: ProgressionLog[];
   ledger: LedgerEntry[];
+  /** home attendance (business-v1 only) */
+  attendance?: number;
 }
 
 export interface RoundOutcome {
@@ -192,13 +199,15 @@ export function processRound(args: {
       } : null;
       const { update, log } = progressPlayer(p, perf, { season, round, clubPlayed: true, reputation: clubById.get(own)!.reputation });
       const ru: RoundPlayerUpdate = update;
-      const plan = clubById.get(own)!.training;
+      const ownClub = clubById.get(own)!;
+      const plan = ownClub.training;
       if (plan) {
-        const t = applyTraining(plan, p, update, `${gameId}|s${season}|r${round}|training|${own}`);
+        const t = applyTraining(plan, p, update, `${gameId}|s${season}|r${round}|training|${own}`, ownClub.staff?.fitness ? staffInjuryFactor(ownClub.staff.fitness.level) : 1);
         ru.fitness = t.fitness;
         ru.development_xp = t.development_xp;
         if (t.injury) { ru.injured_matches = t.injury.matches; ru.injury_type = t.injury.type; }
       }
+      if (ownClub.staff) applyStaff(ownClub.staff, p, ru, !!st?.injury);
       if (st && st.minutes > 0 && st.slot) {
         const fam = addFamiliarity(p.familiarity, st.slot, st.minutes);
         ru.position_familiarity = fam;
@@ -211,19 +220,23 @@ export function processRound(args: {
       if (log) logs.push(log);
     }
 
+    const gate = home.stadium ? matchdayGate({ ...home.stadium, reputation: home.reputation }, away.reputation) : null;
     const ledger: LedgerEntry[] = [
-      { club_id: home.id, type: "gate_receipts", amount_cents: gateReceiptsCents(home.reputation), key: `fixture:${f.id}:gate`, reference: f.id },
+      { club_id: home.id, type: "gate_receipts", amount_cents: gate ? gate.cents : gateReceiptsCents(home.reputation), key: `fixture:${f.id}:gate`, reference: f.id },
     ];
     for (const c of [home, away]) {
       const opp = c.id === home.id ? away.id : home.id;
       const bonus = resultBonusCents(goals[c.id], goals[opp]);
       if (bonus > 0) ledger.push({ club_id: c.id, type: "result_bonus", amount_cents: bonus, key: `fixture:${f.id}:bonus:${c.id}`, reference: f.id });
+      const winBonus = goals[c.id] > goals[opp] ? (c.sponsors ?? []).reduce((s2, d) => s2 + d.win_bonus_cents, 0) : 0;
+      if (winBonus > 0) ledger.push({ club_id: c.id, type: "sponsorship", amount_cents: winBonus, key: `fixture:${f.id}:sponsorwin:${c.id}`, reference: f.id });
     }
 
     out.push({
       fixture_id: f.id, seed, input, input_hash, result,
       lineups: [{ club_id: home.id, resolved: hl }, { club_id: away.id, resolved: al }],
       player_updates: updates, progression_logs: logs, ledger,
+      ...(gate ? { attendance: gate.attendance } : {}),
     });
   }
 
@@ -239,9 +252,24 @@ export function processRound(args: {
   for (const c of clubs) {
     const wages = squadOf(c.id).reduce((s, p) => s + p.wage_cents, 0);
     round_ledger.push({ club_id: c.id, type: "wages", amount_cents: -wages, key: `round:${gameId}:${season}:${round}:wages:${c.id}` });
-    round_ledger.push({ club_id: c.id, type: "sponsorship", amount_cents: sponsorshipCents(c.reputation), key: `round:${gameId}:${season}:${round}:sponsor:${c.id}` });
+    const sponsor = c.sponsors ? c.sponsors.reduce((s2, d) => s2 + d.base_cents, 0) : sponsorshipCents(c.reputation);
+    if (sponsor > 0) round_ledger.push({ club_id: c.id, type: "sponsorship", amount_cents: sponsor, key: `round:${gameId}:${season}:${round}:sponsor:${c.id}` });
+    const staffWages = Object.values(c.staff ?? {}).reduce((s2, x) => s2 + (x?.wage_cents ?? 0), 0);
+    if (staffWages > 0) round_ledger.push({ club_id: c.id, type: "staff_wages", amount_cents: -staffWages, key: `round:${gameId}:${season}:${round}:staff:${c.id}` });
   }
   return { fixtures: out, bye_player_updates: bye, round_ledger };
+}
+
+/** Staff effects on one player's post-round values: assistant (XP), fitness coach (recovery), medical (new injuries). */
+function applyStaff(staff: NonNullable<LeagueClub["staff"]>, before: LeaguePlayer, u: RoundPlayerUpdate, newMatchInjury: boolean) {
+  if (staff.assistant) {
+    const gain = u.development_xp - before.development_xp;
+    if (gain > 0) u.development_xp = Math.round((before.development_xp + gain * staffAssistantXp(staff.assistant.level)) * 1000) / 1000;
+  }
+  if (staff.fitness) u.fitness = Math.min(100, Math.round(u.fitness + staffFitness(staff.fitness.level)));
+  if (staff.medical && newMatchInjury && u.injured_matches > 1) {
+    u.injured_matches = Math.max(1, Math.round(u.injured_matches * staffMedical(staff.medical.level)));
+  }
 }
 
 /** Apply a player update to an in-memory state (used by offline simulations and tests). */

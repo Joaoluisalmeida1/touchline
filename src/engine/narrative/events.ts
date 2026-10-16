@@ -8,14 +8,16 @@ import { createRng, type Rng } from "../common/rng";
 import { sponsorshipCents } from "../economy/economy";
 import { traitOf, type Trait } from "./traits";
 
-export const EVENTS_VERSION = "events-v1";
+export const EVENTS_VERSION = "events-v2";
 
 export type Effect =
   | { type: "morale"; scope: "squad"; delta: number }
   | { type: "morale"; player_id: string; delta: number }
   | { type: "fitness" | "form"; player_id: string; delta: number }
   | { type: "injury" | "unavailable"; player_id: string; matches: number }
-  | { type: "cash"; delta_cents: number; reason: string };
+  | { type: "cash"; delta_cents: number; reason: string }
+  | { type: "confidence" | "fan_mood"; delta: number; reason?: string }
+  | { type: "ticket_price"; level: "low" | "normal" | "high" };
 
 export interface Choice { label: string; detail: string; effects: Effect[] }
 
@@ -49,6 +51,14 @@ export interface EvClub {
   last_results: ("W" | "D" | "L")[];
   position: number | null;
   clubs: number;
+  /** phase 3 context (optional: events that need it simply don't fire without it) */
+  ticket_price?: "low" | "normal" | "high";
+  fan_mood?: number;
+  confidence?: number;
+  main_sponsor?: string | null;
+  next_opponent_human?: string | null;
+  /** event keys already rolled for this club this season (for once-per-season events) */
+  season_keys?: string[];
 }
 
 interface Ctx { club: EvClub; players: (EvPlayer & { trait: Trait; rank: number })[]; round: number; unit: number; rng: Rng }
@@ -323,6 +333,77 @@ export const EVENTS: Def[] = [
     },
   },
 ];
+
+EVENTS.push(
+  {
+    key: "ticket_protest", weight: 9,
+    build(c) {
+      if (c.club.ticket_price !== "high" || (c.club.fan_mood ?? 50) >= 55) return null;
+      return {
+        title: "Claque protesta contra o preço dos bilhetes",
+        body: "Faixas na bancada e um comunicado da claque: os bilhetes estão caros demais para o que a equipa tem mostrado.",
+        payload: {},
+        choices: [
+          { label: "Baixar para preço normal", detail: "Menos receita por jogo, adeptos mais calmos.", effects: [{ type: "ticket_price", level: "normal" }, { type: "fan_mood", delta: 5 }] },
+          { label: "Manter o preço", detail: "Receita protegida; ambiente pesado.", effects: [{ type: "fan_mood", delta: -10 }] },
+        ],
+        default_choice: 1,
+      };
+    },
+  },
+  {
+    key: "investor", weight: 3,
+    build(c) {
+      if ((c.club.season_keys ?? []).includes("investor") || c.round < 3) return null;
+      const amount = roundCash(c.unit * 6);
+      return {
+        title: "Investidor quer entrar no clube",
+        body: `Um fundo propõe uma injeção de ${eur(amount)}. Em troca, a direção passa a exigir mais — e não esquece se falhares.`,
+        payload: {},
+        choices: [
+          { label: `Aceitar (${eur(amount)})`, detail: "Dinheiro já; a confiança da direção baixa até mostrares resultados.", effects: [{ type: "cash", delta_cents: amount, reason: "Investidor" }, { type: "confidence", delta: -8, reason: "Investidor exige resultados" }] },
+          { label: "Recusar", detail: "A direção aprecia a prudência.", effects: [{ type: "confidence", delta: 3, reason: "Recusou investidor" }] },
+        ],
+        default_choice: 1,
+      };
+    },
+  },
+  {
+    key: "sponsor_campaign", weight: 6,
+    build(c) {
+      const p = available(c).filter((x) => x.rank <= 5);
+      if (!c.club.main_sponsor || !p.length) return null;
+      const x = pickOne(c.rng, p);
+      const fee = roundCash(c.unit * 0.12);
+      return {
+        title: `${c.club.main_sponsor} quer ${x.name} numa campanha`,
+        body: `O patrocinador principal quer filmar um anúncio com ${x.name} esta semana.`,
+        payload: { player_id: x.id },
+        choices: [
+          { label: `Aceitar (${eur(fee)})`, detail: "Ele gosta da atenção, mas chega cansado.", effects: [{ type: "cash", delta_cents: fee, reason: "Campanha do patrocinador" }, { type: "fitness", player_id: x.id, delta: -10 }, { type: "morale", player_id: x.id, delta: 4 }] },
+          { label: "Recusar", detail: "O patrocinador fica desagradado — a direção também.", effects: [{ type: "confidence", delta: -2, reason: "Patrocinador desagradado" }] },
+        ],
+        default_choice: 0,
+      };
+    },
+  },
+  {
+    key: "derby_demand", weight: 8,
+    build(c) {
+      if (!c.club.next_opponent_human) return null;
+      return {
+        title: "O presidente quer ganhar o dérbi",
+        body: `O próximo jogo é contra ${c.club.next_opponent_human}. O presidente liga-te: "Este não podemos perder."`,
+        payload: {},
+        choices: [
+          { label: "Prometer a vitória", detail: "A direção e o balneário embalam.", effects: [{ type: "confidence", delta: 4, reason: "Prometeu ganhar o dérbi" }, { type: "morale", scope: "squad", delta: 2 }] },
+          { label: "Pedir calma", detail: "Sem promessas.", effects: [{ type: "confidence", delta: -2, reason: "Não se comprometeu no dérbi" }] },
+        ],
+        default_choice: 1,
+      };
+    },
+  },
+);
 
 export const EVENT_RATE = { first: 0.55, second: 0.2 } as const;
 

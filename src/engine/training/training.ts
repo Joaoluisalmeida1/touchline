@@ -58,13 +58,15 @@ export interface TrainingAdjust {
 export function applyTraining(
   plan: TrainingPlan | null | undefined, before: TrainingPlayerIn, after: { fitness: number; development_xp: number; injured_matches: number },
   seed: string,
+  /** fitness-coach factor on the training-injury chance (1 = none) */
+  injuryFactor = 1,
 ): TrainingAdjust {
   const p = plan ?? DEFAULT_PLAN;
   const xpGain = after.development_xp - before.development_xp;
   const xp = before.development_xp + xpGain * TRAINING.xpMultiplier[p.intensity];
   const fit = after.fitness + TRAINING.fitnessBonus[p.intensity] + (p.focus === "fitness" ? TRAINING.fitnessFocusBonus : 0);
   let injury: TrainingAdjust["injury"] = null;
-  const chance = TRAINING.injuryChance[p.intensity];
+  const chance = TRAINING.injuryChance[p.intensity] * injuryFactor;
   if (chance > 0 && after.injured_matches === 0) {
     const rng = createRng(`${seed}|${before.id}`);
     if (rng.chance(chance)) injury = { matches: rng.int(1, 3), type: "Lesão no treino" };
