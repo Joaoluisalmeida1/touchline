@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, Star } from "lucide-react";
+import { Activity, BarChart3, Star, Swords } from "lucide-react";
 import { Crest } from "@/components/crest";
 import { Bar } from "@/components/fx/motion";
+import { MatchAnalysis } from "@/components/match-analysis";
 import { MatchReplay } from "@/components/match-replay";
 import { Card, CardTitle, Empty, PosPill, cn } from "@/components/ui";
 import { requireUser } from "@/server/auth";
+import { getHeadToHead } from "@/server/league-queries";
 import { getMatch } from "@/server/queries";
 
 export const metadata = { title: "Jogo" };
@@ -34,6 +36,7 @@ export default async function MatchPage({ params }: { params: Promise<{ gameId: 
   }));
   const momentum = (m.fixture.result_json?.momentum ?? []) as number[];
   const short = (name: string, s?: string | null) => s || name.slice(0, 3).toUpperCase();
+  const h2h = await getHeadToHead(user.id, gameId, f.home_club_id, f.away_club_id);
   const motm = [...m.stats].filter((p) => p.rating !== null).sort((a, b) => Number(b.rating) - Number(a.rating))[0];
   return (
     <div className="space-y-5">
@@ -106,6 +109,32 @@ export default async function MatchPage({ params }: { params: Promise<{ gameId: 
               </div>
             ))}
           </div>
+        </Card>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <Card>
+          <CardTitle icon={<Activity />}>Análise · xG ao longo do jogo</CardTitle>
+          <MatchAnalysis home={{ short: short(f.home_name, f.home_short), color: f.home_color }} away={{ short: short(f.away_name, f.away_short), color: f.away_color }}
+            events={m.events.map((e) => ({ minute: e.minute, type: e.event_type, side: e.club_id ? side(e.club_id) : "home", player: e.player_name, xg: typeof e.payload_json?.xg === "number" ? e.payload_json.xg : null }))} />
+        </Card>
+        <Card>
+          <CardTitle icon={<Swords />}>Confronto direto</CardTitle>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border border-line bg-bg/40 p-2"><p className="font-display text-3xl font-extrabold tabular">{h2h.a_wins}</p><p className="truncate text-[10px] font-bold uppercase tracking-wide text-faint">{short(f.home_name, f.home_short)}</p></div>
+            <div className="rounded-xl border border-line bg-bg/40 p-2"><p className="font-display text-3xl font-extrabold tabular text-muted">{h2h.draws}</p><p className="text-[10px] font-bold uppercase tracking-wide text-faint">Empates</p></div>
+            <div className="rounded-xl border border-line bg-bg/40 p-2"><p className="font-display text-3xl font-extrabold tabular">{h2h.b_wins}</p><p className="truncate text-[10px] font-bold uppercase tracking-wide text-faint">{short(f.away_name, f.away_short)}</p></div>
+          </div>
+          <p className="mt-2 text-center text-xs text-muted">{h2h.meetings.length} {h2h.meetings.length === 1 ? "jogo" : "jogos"} nesta liga · golos {h2h.a_goals}–{h2h.b_goals}</p>
+          <ul className="mt-3 space-y-1 text-sm">
+            {h2h.meetings.slice(0, 6).map((x) => (
+              <li key={x.id}>
+                <Link href={`/g/${gameId}/matches/${x.id}`} className={cn("flex items-center justify-between rounded-lg px-2 py-1 hover:bg-surface-2", x.id === f.id && "bg-accent/[.07]")}>
+                  <span className="text-xs text-faint">E{x.season} · J{x.round_number}</span>
+                  <span className="font-display font-bold tabular">{x.home_club_id === f.home_club_id ? `${x.result_home}–${x.result_away}` : `${x.result_away}–${x.result_home}`}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Card>
       </div>
     </div>

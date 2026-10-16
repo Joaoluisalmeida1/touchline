@@ -11,6 +11,8 @@ import { ENGINE_VERSION } from "../../engine/match/config";
 import { processRound, seasonEnd, type LeagueClub, type LeaguePlayer, type StandingRow } from "../../engine/league/round";
 import type { LineupEntry } from "../../engine/lineup/autopick";
 import { asService } from "../pg";
+import { publishRound } from "./newspaper";
+import { flushPush } from "./push";
 
 export interface MatchdayResult {
   status: "processed" | "skipped";
@@ -131,6 +133,15 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
       gameId, round, JSON.stringify({ player_updates: outcome.bye_player_updates, ledger: outcome.round_ledger }),
     ])).rows[0].r);
     log("matchday.complete", { ...ctx, round, season_complete: complete.season_complete });
+    // after-match stages: newspaper + awards + event log, then push. Never fail a processed matchday because of them
+    // (the newspaper page back-fills missing editions lazily).
+    try {
+      await publishRound(pool, gameId, season, round);
+      log("newspaper.published", { ...ctx, round });
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "newspaper.failed", ...ctx, round, error: (e as Error).message }));
+    }
+    await flushPush(pool).catch((e) => console.error(JSON.stringify({ level: "error", msg: "push.failed", ...ctx, error: (e as Error).message })));
     let seasonCompleted = false;
     if (complete.season_complete) {
       await endSeason(pool, gameId);

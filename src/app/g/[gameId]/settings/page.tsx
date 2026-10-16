@@ -1,6 +1,7 @@
-import { Crown, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Bell, Crown, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { CopyInvite } from "@/components/copy-invite";
+import { PushToggle } from "@/components/push-toggle";
 import { Badge, Card, CardTitle, Field, inputCls } from "@/components/ui";
 import { leaveGameAction, revokeInviteAction, rotateInviteAction, updateSettingsAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
@@ -80,6 +81,10 @@ export default async function Settings({ params, searchParams }: { params: Promi
           </dl>
         </Card>
       )}
+      <Card className="lg:col-span-2">
+        <CardTitle icon={<Bell />}>Notificações no telemóvel</CardTitle>
+        <PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
+      </Card>
     </div>
   );
 }
