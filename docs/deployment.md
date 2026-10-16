@@ -45,6 +45,9 @@
 | `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron |
 | `NEXT_PUBLIC_APP_NAME` | opcional |
 | `AUTH_MODE` | **não definir** (default `supabase`). `dev` é recusado na Vercel. |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | opcional — notificações push. Gerar com `npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | opcional, **secreto** — par da chave pública acima |
+| `VAPID_SUBJECT` | opcional, ex.: `mailto:teu-email@exemplo.pt` |
 
    `PLAYERELO_API_KEY` **não** é necessária na Vercel (importação é feita por CLI).
 3. Settings → Functions → Region: a mesma região do Supabase (latência por query).

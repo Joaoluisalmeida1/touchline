@@ -14,6 +14,7 @@ import { requireUser, signIn, signOut, signUp } from "../auth";
 import { createGame, CreateGameInput } from "../services/create-game";
 import { processNextMatchday } from "../services/matchday";
 import { signExternalPlayer } from "../services/external-market";
+import { deletePushSubscription, flushPush, savePushSubscription } from "../services/push";
 import { FORMATIONS, SLOTS } from "../../engine/common/types";
 
 export interface ActionState {
@@ -245,6 +246,7 @@ export async function createOfferAction(_: ActionState, form: FormData): Promise
   const r = await userCommand(gameId, `select public.create_offer($1, $2, $3) as r`,
     [playerId, amountEur.data * 100, key.success ? key.data : randomUUID()], "");
   if (!r.ok) return r;
+  await pushNow();
   const res = (r.data?.r ?? {}) as { status: string; counter_amount_cents?: number; reason?: string };
   if (res.status === "accepted") redirect(`/g/${gameId}/players/${playerId}?toast=signed`);
   if (res.status === "pending") return { ok: true, message: "Proposta enviada ao treinador adversário." };
@@ -277,8 +279,10 @@ export async function signExternalAction(_: ActionState, form: FormData): Promis
 export async function respondOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
   const gameId = uuid.parse(form.get("gameId"));
   const accept = form.get("accept") === "true";
-  return userCommand(gameId, `select public.respond_offer($1, $2) as r`, [uuid.parse(form.get("offerId")), accept],
+  const r = await userCommand(gameId, `select public.respond_offer($1, $2) as r`, [uuid.parse(form.get("offerId")), accept],
     accept ? "Transferência concluída." : "Proposta recusada.");
+  await pushNow();
+  return r;
 }
 
 export async function cancelOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
@@ -330,4 +334,26 @@ export async function seedSyntheticAction(_: ActionState, form: FormData): Promi
   } catch (e) {
     return fail(e);
   }
+}
+
+/* ------------------------------- push ------------------------------- */
+/** Best effort: a failed push never fails the user's action. */
+async function pushNow() {
+  await flushPush(getPool()).catch((e) => console.error(JSON.stringify({ level: "error", msg: "push.failed", error: (e as Error).message })));
+}
+
+const PushSub = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(8).max(100) }) });
+
+export async function savePushSubscriptionAction(sub: unknown): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = PushSub.safeParse(sub);
+  if (!parsed.success) return { error: "Subscrição inválida." };
+  await savePushSubscription(getPool(), user.id, parsed.data);
+  return { ok: true, message: "Notificações ativadas neste dispositivo." };
+}
+
+export async function deletePushSubscriptionAction(endpoint: string): Promise<ActionState> {
+  const user = await requireUser();
+  await deletePushSubscription(getPool(), user.id, z.string().max(1000).parse(endpoint));
+  return { ok: true, message: "Notificações desativadas neste dispositivo." };
 }

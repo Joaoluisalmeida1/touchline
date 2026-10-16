@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, Flag, Play, Radio, Trophy, UserPlus } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Crest } from "@/components/crest";
 import { AnimatedNumber } from "@/components/fx/animated-number";
@@ -10,6 +10,7 @@ import { markNotificationsReadAction, processMatchdayAction, selectClubAction, s
 import { requireUser } from "@/server/auth";
 import { getClubs, getGame, getLastResult, getNextFixture, getNotifications, getStandings } from "@/server/queries";
 import { notificationText } from "@/lib/notifications";
+import { getLatestHeadlines } from "@/server/league-queries";
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
   member_joined: <UserPlus />, game_started: <Flag />, matchday_completed: <CalendarDays />, season_completed: <Trophy />,
@@ -20,9 +21,10 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
   const { gameId } = await params;
   const user = await requireUser();
   const game = (await getGame(user.id, gameId))!;
-  const [clubs, standings, notifications, last, next] = await Promise.all([
+  const [clubs, standings, notifications, last, next, headlines] = await Promise.all([
     getClubs(user.id, gameId), getStandings(user.id, gameId).catch(() => []), getNotifications(user.id, gameId),
     getLastResult(user.id, gameId, game.my_club_id), game.my_club_id ? getNextFixture(user.id, gameId, game.my_club_id) : null,
+    getLatestHeadlines(user.id, gameId, 3).catch(() => []),
   ]);
   const myClub = clubs.find((c) => c.id === game.my_club_id);
   const unread = notifications.filter((n) => !n.read_at).length;
@@ -173,6 +175,22 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
       </Stagger>
 
       <Stagger className="space-y-5" gap={0.08}>
+        {headlines.length > 0 && (
+          <StaggerItem>
+            <Card>
+              <CardTitle icon={<Newspaper />} action={<Link href={`/g/${gameId}/news`} className="flex items-center gap-1 text-xs font-semibold text-muted hover:text-accent">Ler o jornal <ArrowRight className="size-3" /></Link>}>O Apito · J{headlines[0].round}</CardTitle>
+              <ul className="space-y-3">
+                {headlines.map((h, i) => (
+                  <li key={h.id}>
+                    <Link href={h.fixture_id ? `/g/${gameId}/matches/${h.fixture_id}` : `/g/${gameId}/news`} className="group block">
+                      <p className={cn("font-display font-extrabold uppercase leading-tight transition group-hover:text-accent", i === 0 ? "text-2xl" : "text-base text-ink/90")}>{h.headline}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </StaggerItem>
+        )}
         <StaggerItem>
           <Card className="p-0 sm:p-0">
             <div className="p-4 pb-0 sm:p-5 sm:pb-0">

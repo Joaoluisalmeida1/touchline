@@ -23,3 +23,7 @@ create or replace function auth.role() returns text language sql stable as $$
 $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid(), auth.role() to anon, authenticated, service_role;
+
+-- Like Supabase: tables created in public are granted to the API roles by default. Migrations must revoke what they
+-- don't want exposed; the security invariant tests catch any table that forgets.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;

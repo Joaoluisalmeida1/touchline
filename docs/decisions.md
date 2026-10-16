@@ -49,3 +49,13 @@ Vercel Hobby: cron no máximo 1×/dia e precisão ±59 min (verificado em 2026-1
 
 - `/v1/leagues`, `/v1/leagues/{id}/players`, `/v1/clubs/{id}/players`, `/v1/players/{id}/value|style`, `/v1/usage` aparecem listados em `/api-access` mas **sem esquema de resposta** na documentação pública. O cliente aceita lista simples ou embrulhada e preserva campos desconhecidos. `offset` só está documentado para `/v1/players`; o importador deteta páginas repetidas e pára.
 - Limite Free documentado: 500 pedidos/mês e **10 pedidos/min** (o cliente usa 9/min por omissão).
+
+## Imersão (plano em fases)
+
+Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-16):
+
+- **Jornal "O Apito"**: só templates pt-PT, sem LLM (custo zero, determinístico). Uma edição por jornada; jornadas antigas são geradas quando alguém abre o jornal.
+- **Idades**: nunca aleatórias. Fonte prevista: datas de nascimento do **Wikidata** (CC0), importadas por CLI no PC do operador com correspondência por nome + clube; sem correspondência segura ⇒ `age = null` (como hoje). Traços de personalidade são dados de jogo derivados do id do jogador.
+- **Conferências de imprensa**: o treinador escreve o que quiser e escolhe um tom (Confiante · Calmo · Provocador · Evasivo); o tom decide os efeitos, o texto é citado no jornal.
+- **Direção**: a confiança da direção tem consequências (orçamento, objetivos, avisos), mas **ninguém é despedido**.
+- **Entrega**: um branch por fase (`feat/phase-N-…`), testado e integrado antes da fase seguinte.

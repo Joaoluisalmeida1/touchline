@@ -14,7 +14,7 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 
 | Pasta | Conteúdo |
 |---|---|
-| `supabase/migrations` | Schema, RLS, comandos SQL (`0001`–`0009`) |
+| `supabase/migrations` | Schema, RLS, comandos SQL (`0001`–`0012`) |
 | `supabase/seed.sql` | Catálogo + snapshot **fictícios** para dev |
 | `supabase/local/00_supabase_shim.sql` | Só testes: papéis + `auth.uid()` num Postgres simples |
 | `src/engine/common` | RNG determinístico (xmur3+sfc32), hash canónico, tipos |
@@ -24,9 +24,10 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 | `src/engine/economy` | Salários, receitas, prémios, revalorização |
 | `src/engine/lineup` | Formações, adequação posicional, auto-escalação e correção |
 | `src/engine/league` | Orquestração pura de uma jornada / época + simulador offline |
+| `src/engine/narrative` | `narrative-v1`: factos de uma jornada → notícias d'O Apito, prémios da jornada, factos para o registo de eventos (puro, determinístico) |
 | `src/integrations/playerelo` | Cliente HTTP (rate-limit, retries), esquemas Zod tolerantes, importador |
 | `src/integrations/catalog` | Construção de snapshots, gerador sintético |
-| `src/server` | `pg.ts` (impersonação), `queries.ts`, `actions/`, `services/` (criar liga, processar jornada) |
+| `src/server` | `pg.ts` (impersonação), `queries.ts`, `league-queries.ts` (jornal, história, rivalidades), `actions/`, `services/` (criar liga, processar jornada, mercado externo, jornal, push) |
 | `src/app` | Rotas (pt-PT) |
 | `scripts/` | CLI PlayerElo, seed, calibração, reset local |
 | `tests/` | integração (Postgres real), E2E (Playwright) |
@@ -37,9 +38,19 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 2. TS carrega o estado (clubes, táticas, escalação guardada, jogadores) e chama `processRound`: corrige escalações inválidas de forma determinística, simula cada jogo com `seed = game|época|jornada|fixture`, calcula `input_hash`, progressão e ledger.
 3. `finalize_fixture(fixture, payload)` por jogo — lock da fixture; se já `completed` devolve `already_completed` sem efeitos. Valida golos vs eventos e lease. Grava run, eventos, stats, escalação usada, tabela, jogadores (com verificação de `version`), log de progressão e ledger (chaves idempotentes).
 4. `complete_matchday(game, round, payload)` — exige todos os jogos concluídos; aplica estado dos clubes com folga, salários/patrocínios, expira propostas; avança `current_matchday`; liberta a lease.
-5. Última jornada → `end_season`: prémios, rollover de jogadores, nova época e calendário.
+5. Etapas pós-jogo (não fatais — uma falha é registada e a jornada fica processada):
+   - `publishRound` (`services/newspaper.ts`): carrega os factos da jornada, corre `buildEdition` e grava `news_items`, `round_awards` e `game_events` com `on conflict do nothing` (idempotente). A página do jornal faz *back-fill* de jornadas sem edição (`ensureEditions`).
+   - `flushPush` (`services/push.ts`): envia notificações ainda não enviadas por Web Push (no-op sem chaves VAPID) e marca `pushed_at`.
+6. Última jornada → `end_season`: prémios, rollover de jogadores, nova época e calendário.
 
 Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima chamada retoma a mesma jornada e salta jogos já concluídos (`alreadyPlayedClubIds`).
+
+## Registo de eventos e jornal
+
+- `game_events`: factos append-only por (liga, época, jornada, tipo, chave) — resultados, dérbis entre treinadores, surpresas, goleadas, hat-tricks, reviravoltas, golos tardios, expulsões, novo líder, jogador/equipa da jornada. É a base para história, conquistas e rumores nas fases seguintes.
+- `news_items`: uma edição por jornada, histórias ordenadas por "drama" (clubes humanos pesam +15). `round_awards`: equipa (4-3-3), jogador e golo (menor xG) da jornada.
+- Tudo é escrito pelo servidor; membros só leem (RLS `is_game_member`). Mesma jornada ⇒ mesma edição (RNG `game|época|jornada|news|narrative-v1`).
+- `push_subscriptions`: subscrições Web Push por dispositivo, sem grants para clientes (geridas por Server Actions).
 
 ## Segurança
 

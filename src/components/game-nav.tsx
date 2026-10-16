@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeftRight, CalendarDays, Ellipsis, House, ListOrdered, Settings2, Shirt, Swords, Wallet, X } from "lucide-react";
+import { ArrowLeftRight, CalendarDays, Ellipsis, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Swords, Wallet, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,10 +15,12 @@ function useItems(gameId: string, isOwner: boolean) {
     { key: "", label: "Resumo", short: "Resumo", icon: <House className={ICON} /> },
     { key: "/squad", label: "Plantel", short: "Plantel", icon: <Shirt className={ICON} /> },
     { key: "/tactics", label: "Tática", short: "Tática", icon: <Swords className={ICON} /> },
+    { key: "/news", label: "Jornal", short: "Jornal", icon: <Newspaper className={ICON} /> },
     { key: "/fixtures", label: "Jogos", short: "Jogos", icon: <CalendarDays className={ICON} /> },
     { key: "/table", label: "Classificação", short: "Tabela", icon: <ListOrdered className={ICON} /> },
     { key: "/market", label: "Mercado", short: "Mercado", icon: <ArrowLeftRight className={ICON} /> },
     { key: "/finances", label: "Finanças", short: "Finanças", icon: <Wallet className={ICON} /> },
+    { key: "/history", label: "História", short: "História", icon: <ScrollText className={ICON} /> },
     { key: "/settings", label: isOwner ? "Definições" : "Liga", short: isOwner ? "Definições" : "Liga", icon: <Settings2 className={ICON} /> },
   ].map((i) => ({ ...i, href: base + i.key }));
 }
