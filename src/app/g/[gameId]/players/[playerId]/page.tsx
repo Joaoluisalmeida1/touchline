@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { TRAIT_INFO, traitOf } from "@/engine/narrative/traits";
 import Link from "next/link";
 import { CircleCheck, FileSignature, History, LineChart, Tag } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
@@ -56,6 +57,7 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                   <Badge tone="info">Potencial {p.potential_band}</Badge>
+                  <span title={TRAIT_INFO[traitOf(p.id)].hint}><Badge>{TRAIT_INFO[traitOf(p.id)].label}</Badge></span>
                   {p.injured_matches > 0 && <Badge tone="danger">Lesionado ({p.injury_type}) · {p.injured_matches} jogos</Badge>}
                   {p.suspension_matches > 0 && <Badge tone="warn">Suspenso · {p.suspension_matches}</Badge>}
                   {p.listed_price && <Badge tone="accent">À venda</Badge>}

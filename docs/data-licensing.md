@@ -22,6 +22,12 @@
 | Valores e salários | Valor do fornecedor (se existir) marcado como estimativa; salários/contratos são regras do jogo. |
 | Dados fictícios | `provider = 'synthetic'`, `is_synthetic = true`, badge "Dados fictícios" na UI. Nomes gerados por sílabas. |
 
+## Wikidata (datas de nascimento)
+
+- Dados estruturados do Wikidata estão em **CC0** (domínio público): podem ser guardados e mostrados sem atribuição obrigatória (atribuímos na mesma em `attributes_json.birth_date.source`).
+- Só se usam a API de pesquisa e o endpoint SPARQL oficiais, com User-Agent identificável e ≤ 1 pedido/s — nada de *scraping*.
+- Só se guarda a data de nascimento (e o QID) quando a correspondência é única; nunca se inventa nem se estima uma idade.
+
 ## Checklist antes de convidar amigos com dados reais
 
 - [ ] Plano PlayerElo adequado e resposta escrita sobre retenção/exibição em ligas privadas.

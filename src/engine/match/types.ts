@@ -25,6 +25,20 @@ export interface MatchTeamInput {
   starters: MatchPlayerInput[];
   bench: MatchPlayerInput[];
   instructions?: LineupInstructions;
+  /** additive unit modifiers from training focus, press conferences… (rating points; absent = none) */
+  modifiers?: { control?: number; attack?: number; defense?: number };
+  /** opponent player ids this team marks tightly (max 2): they play at 94%, we lose a little control per marker */
+  marking?: string[];
+  /** conditional instructions the engine applies on its own during the second half (max 3) */
+  plans?: MatchPlanRule[];
+}
+
+export interface MatchPlanRule {
+  /** 46..88 */
+  minute: number;
+  when: "losing" | "drawing" | "winning";
+  mentality?: "defensive" | "balanced" | "attacking";
+  sub?: { out: string; in: string };
 }
 
 export interface MatchInput {
@@ -111,4 +125,6 @@ export interface MatchResult {
   /** momentum per 5-minute bucket, -1..1 (positive = home pressure). For UI only. */
   momentum: number[];
   duration_seconds: number;
+  /** match-plan rules that fired (only present when a team had a plan) */
+  plans_fired?: { side: "home" | "away"; rule: number; minute: number; sub_made: boolean }[];
 }

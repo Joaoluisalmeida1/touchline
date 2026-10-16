@@ -75,6 +75,18 @@ Orçamento típico no plano Free (500/mês): âncoras 12 + 7 ligas × ~8 página
 
 Depois de finalizar, o snapshot aparece em **Criar liga**. Confirmar em `/admin/import` o histograma de OVR (elite rara, maioria 60–80) e os avisos (`no_global_anchors…` significa escala relativa à amostra — evitar).
 
+## Idades reais (Wikidata, CC0)
+
+Para jogadores reais sem data de nascimento. Corre no teu PC (precisa de internet e de `SUPABASE_DB_URL`):
+
+```bash
+npm run wikidata:ages -- --leagues all --limit-clubs 3     # ensaio: mostra o que encontraria, não escreve
+npm run wikidata:ages -- --leagues all --apply             # escreve só onde a data ainda é null
+#   opções: --leagues <uuid,uuid> · --since 2023 (passagens pelo clube desde esse ano) · WIKIDATA_CONTACT=email (User-Agent)
+```
+
+Escreve em `source_players`, `dataset_snapshot_players` e nas ligas já criadas (`game_players.age`, `age_known`). Correspondência única por nome dentro do plantel do clube no Wikidata; ambíguos, sem data ao dia ou idades fora de 15–45 ficam por preencher. Volta a correr sem problema (idempotente).
+
 ## Operação de ligas
 
 - Processar jornada: botão do criador (idempotente). Para várias ligas em modo diário: cron da Vercel ou `curl -H "Authorization: Bearer $CRON_SECRET" $APP_BASE_URL/api/cron/process`.

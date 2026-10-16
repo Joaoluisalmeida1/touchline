@@ -85,9 +85,33 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await r.getByRole("button", { name: "Guardar escalação" }).click();
   await expect(r.getByText("Escalação e tática guardadas.")).toBeVisible();
 
+  // Rui's matchday week: press conference (tone + free text), training plan, scouting report
+  await r.goto(`${gameUrl}/week?tab=imprensa`);
+  const tones = r.getByRole("radiogroup", { name: /Tom da resposta/ });
+  await expect(tones.first()).toBeVisible();
+  const nq = await tones.count();
+  for (let i = 0; i < nq; i++) await tones.nth(i).getByRole("radio", { name: i === 0 ? "Provocador" : "Calmo" }).click();
+  await r.getByLabel("Texto da resposta 1").fill("Vamos jogar para ganhar, como sempre.");
+  await r.screenshot({ path: "test-results/week-press-desktop.png", fullPage: true });
+  await r.getByRole("button", { name: "Responder aos jornalistas" }).click();
+  await expect(r.getByText("Conferência terminada")).toBeVisible();
+  await r.getByRole("tab", { name: /^Treino/ }).click();
+  await r.getByText("Intensa", { exact: true }).click();
+  await r.getByText("Posse", { exact: true }).click();
+  await r.getByRole("button", { name: "Guardar treino" }).click();
+  await expect(r.getByText("Plano de treino guardado.")).toBeVisible();
+  await r.screenshot({ path: "test-results/week-training-desktop.png", fullPage: true });
+  await r.getByRole("tab", { name: /^Adversário/ }).click();
+  await expect(r.getByText("Relatório do olheiro")).toBeVisible();
+  await r.screenshot({ path: "test-results/week-scout-desktop.png", fullPage: true });
+
   // Ana processes matchday 1
   await a.getByRole("button", { name: /Jogar jornada 1/ }).click();
   await expect(a.getByText("Jornada 1 concluída.", { exact: true })).toBeVisible({ timeout: 30_000 });
+
+  // O Apito quotes Rui's press conference
+  await r.goto(`${gameUrl}/news`);
+  await expect(r.getByText(/Vamos jogar para ganhar, como sempre/).first()).toBeVisible();
 
   // Rui sees the result, opens the match and the table
   await r.goto(`${gameUrl}/fixtures`);

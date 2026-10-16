@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeftRight, CalendarDays, Ellipsis, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Swords, Wallet, X } from "lucide-react";
+import { ArrowLeftRight, CalendarDays, ClipboardList, Ellipsis, House, ListOrdered, Newspaper, ScrollText, Settings2, Shirt, Wallet, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,7 +14,7 @@ function useItems(gameId: string, isOwner: boolean) {
   return [
     { key: "", label: "Resumo", short: "Resumo", icon: <House className={ICON} /> },
     { key: "/squad", label: "Plantel", short: "Plantel", icon: <Shirt className={ICON} /> },
-    { key: "/tactics", label: "Tática", short: "Tática", icon: <Swords className={ICON} /> },
+    { key: "/week", label: "Semana", short: "Semana", icon: <ClipboardList className={ICON} /> },
     { key: "/news", label: "Jornal", short: "Jornal", icon: <Newspaper className={ICON} /> },
     { key: "/fixtures", label: "Jogos", short: "Jogos", icon: <CalendarDays className={ICON} /> },
     { key: "/table", label: "Classificação", short: "Tabela", icon: <ListOrdered className={ICON} /> },
@@ -31,7 +31,7 @@ function activeHref(path: string, items: { key: string; href: string }[], base: 
   const hit = items.filter((i) => i.key && path.startsWith(i.href)).sort((a, b) => b.href.length - a.href.length)[0];
   if (hit) return hit.href;
   if (path.includes("/matches/")) return base + "/fixtures";
-  if (path.includes("/players/")) return base + "/squad";
+  if (path.includes("/players/") || path.endsWith("/tactics")) return base + "/squad";
   return "";
 }
 
@@ -47,7 +47,7 @@ export function GameNav({ gameId, isOwner }: { gameId: string; isOwner: boolean 
   );
 }
 
-const DOCK = ["", "/squad", "/fixtures", "/table", "/market"];
+const DOCK = ["", "/squad", "/week", "/table", "/market"];
 
 /** Mobile: thumb-reachable dock (Watermelon "Dock" spring) + "Mais" sheet for the rest. */
 export function MobileDock({ gameId, isOwner }: { gameId: string; isOwner: boolean }) {

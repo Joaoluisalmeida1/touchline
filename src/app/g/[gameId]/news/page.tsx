@@ -14,7 +14,7 @@ export const metadata = { title: "O Apito" };
 
 const KIND_LABEL: Record<string, string> = {
   derby: "Duelo de treinadores", upset: "Surpresa", thrashing: "Goleada", hat_trick: "Hat-trick", comeback: "Reviravolta",
-  late_winner: "Golo tardio", new_leader: "Liderança", red_card: "Expulsão", goal_fest: "Festival de golos", human_result: "Os nossos", title_race: "Título",
+  late_winner: "Golo tardio", new_leader: "Liderança", red_card: "Expulsão", goal_fest: "Festival de golos", human_result: "Os nossos", title_race: "Título", press: "Imprensa",
 };
 
 export default async function NewsPage({ params, searchParams }: { params: Promise<{ gameId: string }>; searchParams: Promise<{ s?: string; r?: string }> }) {

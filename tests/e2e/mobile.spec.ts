@@ -36,4 +36,16 @@ test("squad hub works on a phone (tap-to-place, no horizontal scroll)", async ({
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.screenshot({ path: "test-results/squad-hub-mobile.png", fullPage: false });
+  // the matchday week fits a phone too (league started → press + training + scouting tabs)
+  page.on("dialog", (d) => d.accept());
+  await page.goto(gameUrl);
+  await page.getByRole("button", { name: "Iniciar liga" }).click();
+  await expect(page.getByRole("button", { name: /Jogar jornada 1/ })).toBeVisible();
+  await page.goto(`${gameUrl}/week?tab=imprensa`);
+  await expect(page.getByRole("radiogroup", { name: /Tom da resposta/ }).first()).toBeVisible();
+  for (const tab of [/^Treino/, /^Adversário/, /^Imprensa/]) {
+    await page.getByRole("tab", { name: tab }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  }
+  await page.screenshot({ path: "test-results/week-mobile.png", fullPage: true });
 });

@@ -17,6 +17,7 @@ export function pushConfig() {
 const TITLE: Record<string, string> = {
   matchday_completed: "Jornada concluída", offer_received: "Nova proposta", offer_rejected: "Proposta recusada",
   transfer_completed: "Transferência", member_joined: "Novo treinador", game_started: "A liga começou", season_completed: "Fim de época",
+  week_ready: "Semana de jornada",
 };
 
 /** Sends every not-yet-pushed notification of the last day to its user's devices, then marks it pushed. */

@@ -357,3 +357,62 @@ export async function deletePushSubscriptionAction(endpoint: string): Promise<Ac
   await deletePushSubscription(getPool(), user.id, z.string().max(1000).parse(endpoint));
   return { ok: true, message: "Notificações desativadas neste dispositivo." };
 }
+
+/* ------------------------------- matchday week (phase 2) ------------------------------- */
+const TrainingInput = z.object({
+  gameId: uuid, intensity: z.enum(["light", "normal", "intense"]),
+  focus: z.enum(["none", "attack", "defense", "possession", "set_pieces", "fitness", "tactics"]),
+});
+export async function saveTrainingAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const t = TrainingInput.parse({ gameId: form.get("gameId"), intensity: form.get("intensity"), focus: form.get("focus") });
+    return userCommand(t.gameId, `select public.save_training_plan($1, $2, $3)`, [t.gameId, t.intensity, t.focus], "Plano de treino guardado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+const PlanInput = z.object({
+  gameId: uuid,
+  rules: z.array(z.object({
+    minute: z.number().int().min(46, "Regras só na 2.ª parte (46'–88').").max(88, "Regras só na 2.ª parte (46'–88')."),
+    when: z.enum(["losing", "drawing", "winning"]),
+    mentality: z.enum(["defensive", "balanced", "attacking"]).optional(),
+    sub: z.object({ out: uuid, in: uuid }).optional(),
+  }).refine((r) => r.mentality || r.sub, "Cada regra precisa de uma mudança de mentalidade ou de uma substituição.")).max(3, "Máximo de 3 regras."),
+  marking: z.array(uuid).max(2, "Máximo de 2 marcações."),
+});
+export async function saveMatchPlanAction(input: z.input<typeof PlanInput>): Promise<ActionState> {
+  try {
+    const p = PlanInput.parse(input);
+    return userCommand(p.gameId, `select public.save_match_plan($1, $2, $3)`, [p.gameId, JSON.stringify(p.rules), JSON.stringify(p.marking)], "Plano de jogo guardado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+const PressInput = z.object({
+  gameId: uuid, confId: uuid,
+  answers: z.array(z.object({
+    key: z.string().min(1).max(40), tone: z.enum(["confident", "calm", "provocative", "evasive"], { message: "Escolhe um tom para cada resposta." }),
+    text: z.string().trim().max(280, "Máximo de 280 caracteres por resposta."),
+  })).min(1).max(5),
+});
+export async function answerPressAction(input: z.input<typeof PressInput>): Promise<ActionState> {
+  try {
+    const p = PressInput.parse(input);
+    return userCommand(p.gameId, `select public.answer_press($1, $2) as r`, [p.confId, JSON.stringify(p.answers)], "Conferência terminada. As tuas palavras vão sair n'O Apito.", [`/g/${p.gameId}/week`]);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function answerEventAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const choice = z.coerce.number().int().min(0).max(9).parse(form.get("choice"));
+    return userCommand(gameId, `select public.answer_inbox_event($1, $2) as r`, [uuid.parse(form.get("eventId")), choice], "Decisão tomada.");
+  } catch (e) {
+    return fail(e);
+  }
+}

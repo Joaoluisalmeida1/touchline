@@ -63,11 +63,16 @@ export interface RoundFacts {
   table_before: NTableRow[];
   table_after: NTableRow[];
   head_to_head: NHeadToHead[];
+  /** answered pre-match press conferences for this round (phase 2); absent/empty = no press stories */
+  press?: NPress[];
 }
+
+export type PressTone = "confident" | "calm" | "provocative" | "evasive";
+export interface NPress { club_id: string; opponent_id: string | null; answers: { question: string; tone: PressTone; text: string }[] }
 
 export type StoryKind =
   | "derby" | "upset" | "thrashing" | "hat_trick" | "comeback" | "late_winner" | "new_leader" | "red_card"
-  | "goal_fest" | "human_result" | "title_race";
+  | "goal_fest" | "human_result" | "title_race" | "press";
 
 export interface Story {
   kind: StoryKind;
