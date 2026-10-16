@@ -13,7 +13,9 @@ export interface AchievementCtx {
   round: number;
   champion_seasons: number;
   objectives_met: number;
-  facts: Partial<Record<"comeback" | "late_winner" | "hat_trick" | "player_of_round" | "team_of_round", number>>;
+  facts: Partial<Record<"comeback" | "late_winner" | "hat_trick" | "player_of_round" | "team_of_round" | "cup_winner", number>>;
+  /** academy prospects promoted to the first team (phase 4b; optional for older callers) */
+  academy_promoted?: number;
   buys: number[];                // transfer fees paid (cents)
   sale_multiples: number[];      // sale price / price paid, for players bought then sold
   swaps: number;
@@ -66,6 +68,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { key: "builder", title: "Obra feita", description: "Conclui uma obra no estádio.", tier: "bronze", check: (c) => c.upgrades_done > 0 },
   { key: "press_regular", title: "Figura mediática", description: "Responde a 5 conferências de imprensa.", tier: "bronze", check: (c) => c.press_answered >= 5 },
   { key: "office_hours", title: "Gestor de gabinete", description: "Decide 10 assuntos no Gabinete.", tier: "bronze", check: (c) => c.events_answered >= 10 },
+  { key: "cup_winner", title: "Taça no museu", description: "Ganha a Taça da Liga dos Amigos.", tier: "gold", check: (c) => (c.facts.cup_winner ?? 0) > 0 },
+  { key: "academy_graduate", title: "Prata da casa", description: "Promove um jovem da academia à equipa principal.", tier: "bronze", check: (c) => (c.academy_promoted ?? 0) > 0 },
   { key: "rich", title: "Cofre cheio", description: "Duplica o saldo inicial do clube.", tier: "gold", check: (c) => c.initial_cash_cents > 0 && c.cash_cents >= 2 * c.initial_cash_cents },
 ];
 

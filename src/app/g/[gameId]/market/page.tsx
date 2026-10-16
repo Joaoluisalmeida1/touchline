@@ -4,7 +4,8 @@ import { ActionForm } from "@/components/action-form";
 import { ExternalOfferForm } from "@/components/external-offer-form";
 import { PlayerAvatar } from "@/components/squad/avatar";
 import { Badge, Card, CardTitle, Empty, FormArrow, OvrBadge, PosPill, cn, eur, inputCls } from "@/components/ui";
-import { acceptCounterAction, cancelOfferAction, counterOfferAction, respondOfferAction } from "@/server/actions";
+import { acceptCounterAction, cancelOfferAction, counterOfferAction, respondOfferAction, signFreeAgentAction } from "@/server/actions";
+import { getFreeAgents } from "@/server/career-queries";
 import { randomUUID } from "node:crypto";
 import { requireUser } from "@/server/auth";
 import { getExternalPlayer, getGame, getMarketLeagues, getOffers, getRecentTransfers, searchMarket } from "@/server/queries";
@@ -26,6 +27,8 @@ export default async function Market({ params, searchParams }: { params: Promise
     q: sp.q?.slice(0, 40), listedOnly: sp.listed === "1", page: Math.max(1, Number(sp.page) || 1),
     league: sp.league === "game" || UUID.test(sp.league ?? "") ? sp.league : "",
   };
+  const freeAgents = await getFreeAgents(user.id, gameId, game.current_season);
+  const windowOpen = game.status === "active" && game.current_matchday <= 3;
   const [market, offers, transfers, leagues, scout] = await Promise.all([
     searchMarket(user.id, gameId, filters), getOffers(user.id, gameId), getRecentTransfers(user.id, gameId), getMarketLeagues(user.id, gameId),
     UUID.test(sp.scout ?? "") ? getExternalPlayer(user.id, gameId, sp.scout!) : null,
@@ -150,6 +153,26 @@ export default async function Market({ params, searchParams }: { params: Promise
       </div>
 
       <div className="space-y-5">
+        {freeAgents.length > 0 && (
+          <Card glow={windowOpen}>
+            <CardTitle action={<Badge tone={windowOpen ? "accent" : "default"} dot={windowOpen}>{windowOpen ? "Até à J3" : "Fechado"}</Badge>}>Jogadores livres</CardTitle>
+            <ul className="space-y-2 text-sm">
+              {freeAgents.map((p) => (
+                <li key={p.id} className="flex items-center gap-2.5">
+                  <OvrBadge ovr={p.current_ovr} size="sm" />
+                  <PosPill group={p.position_group} />
+                  <Link href={`/g/${gameId}/players/${p.id}`} className="flex-1 truncate font-semibold hover:text-accent">{p.name_snapshot}</Link>
+                  <span className="text-xs text-muted tabular">{eur(p.free_agent_wage_cents)}/j</span>
+                  {windowOpen && game.my_club_id && (
+                    <ActionForm action={signFreeAgentAction} hidden={{ gameId, playerId: p.id }} submitLabel="Contratar" variant="ghost" inline submitClassName="min-h-8 px-2 text-xs"
+                      confirm={`Contratar ${p.name_snapshot} sem custo de transferência (salário ${eur(p.free_agent_wage_cents, false)}/jornada)?`} />
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-faint">Saíram em fim de contrato. Sem custo de transferência; depois da 3.ª jornada os clubes da IA ficam com os que sobrarem.</p>
+          </Card>
+        )}
         <Card>
           <CardTitle icon={<Handshake />}>As minhas propostas</CardTitle>
           {offers.length === 0 ? <p className="text-sm text-muted">Sem propostas.</p> : (

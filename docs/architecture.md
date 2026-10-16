@@ -41,10 +41,11 @@ Vercel Cron (1×/dia) ──► /api/cron/process ──► processNextMatchday 
 5. Etapas pós-jogo (não fatais — uma falha é registada e a jornada fica processada):
    - `publishRound` (`services/newspaper.ts`): carrega os factos da jornada, corre `buildEdition` e grava `news_items`, `round_awards` e `game_events` com `on conflict do nothing` (idempotente). A página do jornal faz *back-fill* de jornadas sem edição (`ensureEditions`).
    - `afterRound` (`services/business.ts`): humor dos adeptos e confiança da direção (avisos, cortes/reforços de orçamento), uma vez por jornada (marca `business_round`).
+   - `playDueCupRounds` (`services/cup.ts`) joga a(s) ronda(s) da taça marcadas para depois desta jornada; `academyAfterRound` e `aiSignFreeAgents` (`services/career.ts`) tratam da academia e dos jogadores livres.
    - `afterRoundSocial` (`services/social.ts`): manchete da jornada no mural e avaliação de conquistas (marca `social_round`).
    - `prepareWeek` (`services/week.ts`): prepara a jornada seguinte — conferências de imprensa dos clubes humanos e assuntos do Gabinete para todos os clubes — uma só vez (marca `week_prepared`).
    - `flushPush` (`services/push.ts`): envia notificações ainda não enviadas por Web Push (no-op sem chaves VAPID) e marca `pushed_at`.
-6. Última jornada → `end_season`: prémios, rollover de jogadores, nova época e calendário.
+6. Última jornada → `seasonEndCareer` (saídas em fim de contrato) → `end_season`: prémios, rollover de jogadores, nova época e calendário.
 
 Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima chamada retoma a mesma jornada e salta jogos já concluídos (`alreadyPlayedClubIds`).
 
@@ -72,6 +73,12 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 
 - `transfer_offers` ganhou `parent_offer_id` (negociação), `swap_player_id`, `message`, `counter_message` e o estado `countered`; o valor pode ser 0 quando há troca. `_execute_transfer` move os dois jogadores, anula propostas pendentes sobre ambos e publica no mural.
 - Tabelas: `wall_posts` (com `dedupe_key` para publicações automáticas idempotentes), `wall_reactions`, `achievements` (única por liga/treinador/conquista). Só leitura para membros; escrita apenas por comandos (`post_wall`, `react_wall`, `delete_wall_post`) ou pelo servidor.
+
+## Taças e carreira (fase 4b)
+
+- Tabelas: `cup_ties` (quadro, resultados, penáltis, eventos resumidos), `academy_prospects`, `contract_talks`; colunas `game_players.free_agent_since` e `free_agent_wage_cents` (com GRANT de coluna para membros).
+- Comandos: `promote_prospect`, `release_prospect`, `renew_contract`, `sign_free_agent`. Quadro, jovens e exigências salariais são gerados pelo servidor (TS determinístico) e guardados.
+- Motor: `buildMatchInput` (extraído de `processRound`) é partilhado entre liga e taça; `src/engine/cup` e `src/engine/career` são puros e testados.
 
 ## Segurança
 
