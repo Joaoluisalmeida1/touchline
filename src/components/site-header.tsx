@@ -17,7 +17,7 @@ export function LogoMark({ size = 28 }: { size?: number }) {
 
 export function Logo() {
   return (
-    <Link href="/" className="group flex items-center gap-2" aria-label={`${APP_NAME} — início`}>
+    <Link href="/" prefetch={false} className="group flex items-center gap-2" aria-label={`${APP_NAME} — início`}>
       <span className="transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110"><LogoMark /></span>
       <span className="font-display text-[22px] font-extrabold uppercase italic leading-none tracking-tight">{APP_NAME}</span>
     </Link>
@@ -40,7 +40,7 @@ export function SiteHeader({ user }: { user?: { email: string | null } | null })
         <nav className="flex items-center gap-1 text-sm">
           {user ? (
             <>
-              <Link href="/dashboard" className="flex items-center gap-2 rounded-xl px-3 py-2 font-semibold text-muted transition hover:bg-surface-2 hover:text-ink">
+              <Link href="/dashboard" prefetch={false} className="flex items-center gap-2 rounded-xl px-3 py-2 font-semibold text-muted transition hover:bg-surface-2 hover:text-ink">
                 <Trophy className="size-4" /><span className="hidden sm:inline">As minhas ligas</span>
               </Link>
               <form action={logoutAction}>

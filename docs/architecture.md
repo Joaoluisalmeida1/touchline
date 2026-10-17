@@ -84,4 +84,22 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 
 ## Observabilidade
 
-Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD.
+Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`, `page.failed`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD. Erros de página mostram `error.tsx` (liga e app) com a referência (`digest`) que aparece nos logs.
+
+## Desempenho do pedido
+
+Cada página de liga é dinâmica e renderizada por pedido. O custo dominante são idas e voltas (à BD e ao Supabase Auth), por isso:
+
+| Regra | Onde |
+|---|---|
+| `withUser` abre a transação, define as claims e muda de papel numa só ida à BD (`begin; select set_config(…)`); o `userId` é validado como UUID | `src/server/pg.ts` |
+| Utilizador e cabeçalho da liga resolvidos uma vez por pedido (`React.cache`): `getUser`, `getGame`, `getClubColors`, `getProfile` | `src/server/auth.ts`, `src/server/queries.ts` |
+| Sessão verificada com `getClaims()` (JWT verificado localmente com chaves assimétricas; com chaves HS256 legadas cai para `getUser()`) | `src/server/auth.ts`, `src/middleware.ts` |
+| O middleware ignora prefetches do router e ficheiros estáticos (`sw.js`, ícones) | `src/middleware.ts` |
+| Navegação sempre visível (tabs da liga, cabeçalho) com `prefetch={false}`: sem *loading boundary*, o prefetch não trazia nada reutilizável mas custava um pedido por link | `src/components/fx/tabs.tsx`, `site-header.tsx` |
+| Pool `pg` registado com `attachDatabasePool` (Fluid compute fecha ligações inativas antes de suspender) | `src/server/db.ts` |
+| Índices só para caminhos reais (leituras quentes, cron, eliminação de ligas); FKs de tabelas pequenas por clube ficam sem índice de propósito | `supabase/migrations/…0017_perf_indexes.sql` |
+
+Medido localmente (build de produção, mesmo fluxo): por página, prefetches 12–16 → 0–7 e instruções SQL −20% a −55% (ex.: Finanças 29 → 15, Plantel 39 → 18). Ao criar uma consulta nova, preferir juntar leituras da mesma página numa só chamada `withUser` em vez de várias em paralelo (cada uma ocupa uma ligação do pool).
+
+**Não usar `loading.tsx` em `src/app/g/[gameId]/` por agora**: com esse boundary, as Server Actions das páginas da liga (escolher clube, iniciar liga) deixam de atualizar a página. Ver o erro `null (reading 'status')` no Resumo, que já existe em `main` e deve ser resolvido primeiro.

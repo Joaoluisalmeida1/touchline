@@ -1,4 +1,5 @@
 import "server-only";
+import { attachDatabasePool } from "@vercel/functions";
 import { Pool, type PoolClient } from "pg";
 import { serverEnv } from "./env";
 import { asService, asUser } from "./pg";
@@ -15,7 +16,11 @@ const globalForPg = globalThis as unknown as { __touchlinePool?: Pool };
 
 export function getPool(): Pool {
   if (!globalForPg.__touchlinePool) {
-    globalForPg.__touchlinePool = new Pool(pgPoolConfig(serverEnv().SUPABASE_DB_URL, Number(process.env.PG_POOL_MAX ?? 5)));
+    const pool = new Pool(pgPoolConfig(serverEnv().SUPABASE_DB_URL, Number(process.env.PG_POOL_MAX ?? 5)));
+    // Vercel Fluid compute: keep the instance alive until idle clients are closed, so suspended instances don't leave
+    // connections open on the Supavisor pooler. No-op outside Vercel.
+    attachDatabasePool(pool);
+    globalForPg.__touchlinePool = pool;
   }
   return globalForPg.__touchlinePool;
 }
