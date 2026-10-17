@@ -50,7 +50,8 @@
 | `VAPID_SUBJECT` | opcional, ex.: `mailto:teu-email@exemplo.pt` |
 
    `PLAYERELO_API_KEY` **não** é necessária na Vercel (importação é feita por CLI).
-3. Settings → Functions → Region: a mesma região do Supabase (latência por query).
+3. Settings → Functions → Region: a mesma região do Supabase (latência por query — cada página faz 10–40 instruções SQL). Manter **Fluid compute** ligado (default); o pool já está registado com `attachDatabasePool`.
+   No Supabase: Project Settings → **JWT Keys** → usar chaves assimétricas (ECC/RSA). Assim `getClaims()` verifica a sessão localmente, sem ida ao Supabase Auth em cada pedido; com a chave HS256 legada funciona na mesma, mas faz a chamada de rede.
 4. Deploy. O `vercel.json` regista o cron diário `0 19 * * *` em `/api/cron/process` (Hobby: 1×/dia, ±59 min).
 5. Verificar:
    ```bash

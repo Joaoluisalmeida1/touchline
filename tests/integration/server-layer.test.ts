@@ -13,6 +13,7 @@ import * as Q from "../../src/server/queries";
 import * as A from "../../src/server/actions";
 import { GET as health } from "../../src/app/api/health/route";
 import { GET as cron } from "../../src/app/api/cron/process/route";
+import { asUser as asUserProd } from "../../src/server/pg";
 import { createUser, freshDb, LOCAL_PG } from "../support/db";
 
 const session = vi.hoisted(() => ({ user: null as { id: string; email: string | null } | null }));
@@ -180,6 +181,21 @@ describe("queries (RLS on the real read path)", () => {
     const { rows } = await Q.searchMarket(owner, gameId, { minOvr: 1, maxOvr: 99 });
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((p) => p.manager_user_id !== owner)).toBe(true);
+  });
+});
+
+describe("asUser (role impersonation)", () => {
+  it("runs as `authenticated` with the user's claims in a single setup round trip", async () => {
+    const r = await asUserProd(pool, owner, (c) => c.query(`select current_user, auth.uid() as uid`).then((x) => x.rows[0]));
+    expect(r).toEqual({ current_user: "authenticated", uid: owner });
+  });
+
+  it("rejects anything that is not a UUID (values are inlined into the setup statement)", async () => {
+    for (const bad of ["", "not-a-uuid", `${owner}'; drop table games; --`, `${owner}\n`]) {
+      await expect(asUserProd(pool, bad, async () => null)).rejects.toThrow(/must be a UUID/);
+    }
+    // the role switch is transaction-local: the pooled connection is back to the owner role afterwards
+    expect((await pool.query(`select current_user`)).rows[0].current_user).not.toBe("authenticated");
   });
 });
 

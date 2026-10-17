@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { serverEnv } from "./env";
 import { getPool } from "./db";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -32,12 +33,20 @@ async function setDevCookie(id: string) {
 }
 /* ------------------------------------------------------------------------------------------------------------------- */
 
-export async function getUser(): Promise<SessionUser | null> {
+/**
+ * The signed-in user, resolved once per request (React cache): layouts and pages both call this.
+ * getClaims() verifies the JWT signature locally against the project's JWKS (asymmetric signing keys), so it needs no
+ * round trip to Supabase Auth; with legacy HS256 keys it falls back to getUser() (a network call), exactly as before.
+ * Trade-off: a session revoked server-side stays valid until the access token expires (Supabase default 1 h).
+ */
+export const getUser = cache(async (): Promise<SessionUser | null> => {
   if (serverEnv().AUTH_MODE === "dev") return devUser();
   const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser(); // validates the JWT with Supabase Auth
-  return data.user ? { id: data.user.id, email: data.user.email ?? null } : null;
-}
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub) return null;
+  return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
+});
 
 export async function requireUser(next?: string): Promise<SessionUser> {
   const u = await getUser();
