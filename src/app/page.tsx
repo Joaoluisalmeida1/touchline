@@ -18,7 +18,6 @@ const XI = [[50, 8], [16, 26], [38, 22], [62, 22], [84, 26], [30, 48], [50, 42],
 function HeroArt() {
   return (
     <div className="relative mx-auto w-full max-w-[460px]">
-      <div aria-hidden className="absolute -inset-10 rounded-full bg-accent/10 blur-3xl" />
       <div className="relative aspect-[4/5] overflow-hidden rounded-[28px] border border-line-strong bg-pitch shadow-[0_40px_120px_-40px_rgb(0_0_0/.9)]">
         <div aria-hidden className="absolute inset-0 bg-[repeating-linear-gradient(0deg,rgb(255_255_255/.035)_0,rgb(255_255_255/.035)_10%,transparent_10%,transparent_20%)]" />
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 125" preserveAspectRatio="none" aria-hidden>
@@ -29,7 +28,7 @@ function HeroArt() {
         </svg>
         {XI.map(([x, y], i) => (
           <div key={i} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${x}%`, top: `${100 - y}%` }}>
-            <Shirt primary="#d4ff3a" secondary="#0b0e00" number={[1, 2, 4, 5, 3, 8, 6, 10, 7, 9, 11][i]} size={34} />
+            <Shirt primary="#3a5bf0" secondary="#ffffff" number={[1, 2, 4, 5, 3, 8, 6, 10, 7, 9, 11][i]} size={34} />
           </div>
         ))}
         <div className="absolute inset-x-4 top-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/55 p-2 backdrop-blur-md">

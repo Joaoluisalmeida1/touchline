@@ -80,6 +80,11 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 - Comandos: `promote_prospect`, `release_prospect`, `renew_contract`, `sign_free_agent`. Quadro, jovens e exigências salariais são gerados pelo servidor (TS determinístico) e guardados.
 - Motor: `buildMatchInput` (extraído de `processRound`) é partilhado entre liga e taça; `src/engine/cup` e `src/engine/career` são puros e testados.
 
+## Interface v2 (fundação)
+
+- `src/app/g/[gameId]/layout.tsx` carrega o jogo, as cores do clube, `getTodayItems` (decisões pendentes, RLS) e o plantel leve, e entrega tudo ao `GameShell` (cliente): barra lateral, barra de contexto com sub-separadores do hub, prazo, ⌘K e gaveta "Por decidir"; doca de 5 hubs no telemóvel.
+- Temas por variáveis CSS (`data-theme` em `<html>`), definidos antes do primeiro paint por `src/lib/prefs.ts`. Detalhes em `docs/design-system.md`.
+
 ## Segurança
 
 - RLS em todas as tabelas `public` (teste automático). Leituras por membership (`is_game_member`), dados privados por clube (táticas, escalação atual, ledger, propostas) e notificações por utilizador.

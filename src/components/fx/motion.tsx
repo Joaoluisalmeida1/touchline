@@ -5,17 +5,20 @@
  */
 import { MotionConfig, motion, type HTMLMotionProps } from "motion/react";
 import type { ReactNode } from "react";
+import { usePrefs } from "../shell/use-prefs";
 
 export const spring = { type: "spring", stiffness: 380, damping: 32, mass: 0.8 } as const;
 export const softSpring = { type: "spring", stiffness: 240, damping: 26, mass: 0.9 } as const;
 
+/** Follows the system setting, or the in-app "Reduzir movimento" toggle when it is on. */
 export function MotionProvider({ children }: { children: ReactNode }) {
-  return <MotionConfig reducedMotion="user" transition={spring}>{children}</MotionConfig>;
+  const { reduce } = usePrefs();
+  return <MotionConfig reducedMotion={reduce ? "always" : "user"} transition={spring}>{children}</MotionConfig>;
 }
 
 const rise = {
-  hidden: { opacity: 0, y: 10, filter: "blur(6px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { type: "spring", stiffness: 260, damping: 28 } },
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 28 } },
 } as const;
 
 /** Fades + un-blurs its content in on mount. */

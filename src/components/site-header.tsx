@@ -2,24 +2,24 @@ import Link from "next/link";
 import { LogOut, Trophy } from "lucide-react";
 import { APP_NAME } from "@/lib/brand";
 import { logoutAction } from "@/server/actions";
+import { ThemeToggle } from "./shell/theme-toggle";
 
+/** Touchline mark: a pitch outline with the touchline drawn in brand blue. */
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <defs>
-        <linearGradient id="tl-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#efffb0" /><stop offset=".55" stopColor="#d4ff3a" /><stop offset="1" stopColor="#8fc70a" /></linearGradient>
-      </defs>
-      <path d="M7 2h22l-4 28H3z" fill="url(#tl-g)" />
-      <path d="M10.5 9.5h13M16.7 9.5 14.4 25" stroke="#0b0e00" strokeWidth="3.2" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden>
+      <rect x="1.5" y="1.5" width="31" height="31" rx="4" fill="none" stroke="currentColor" strokeWidth="2.5" />
+      <rect x="1" y="1" width="9" height="32" rx="3" fill="var(--color-brand)" />
+      <path d="M21.5 1.5v31" stroke="currentColor" strokeWidth="1.5" opacity=".35" />
     </svg>
   );
 }
 
 export function Logo() {
   return (
-    <Link href="/" className="group flex items-center gap-2" aria-label={`${APP_NAME} — início`}>
-      <span className="transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110"><LogoMark /></span>
-      <span className="font-display text-[22px] font-extrabold uppercase italic leading-none tracking-tight">{APP_NAME}</span>
+    <Link href="/" className="group flex items-center gap-2.5" aria-label={`${APP_NAME} — início`}>
+      <LogoMark />
+      <span className="font-display text-[22px] font-black uppercase leading-none tracking-[0.02em] [font-stretch:66%]">{APP_NAME}</span>
     </Link>
   );
 }
@@ -34,10 +34,11 @@ function Initials({ email }: { email: string | null }) {
 
 export function SiteHeader({ user }: { user?: { email: string | null } | null }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-line/80 bg-bg/75 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60">
+    <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/80">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <Logo />
-        <nav className="flex items-center gap-1 text-sm">
+        <nav className="flex items-center gap-1.5 text-sm">
+          <ThemeToggle />
           {user ? (
             <>
               <Link href="/dashboard" className="flex items-center gap-2 rounded-xl px-3 py-2 font-semibold text-muted transition hover:bg-surface-2 hover:text-ink">
@@ -51,7 +52,7 @@ export function SiteHeader({ user }: { user?: { email: string | null } | null })
               <Initials email={user.email} />
             </>
           ) : (
-            <Link href="/auth" className="rounded-xl bg-accent px-4 py-2 font-bold text-accent-ink transition hover:brightness-105">Entrar</Link>
+            <Link href="/auth" className="rounded-[10px] bg-accent px-4 py-2 font-bold text-accent-ink transition hover:brightness-110">Entrar</Link>
           )}
         </nav>
       </div>

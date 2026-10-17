@@ -9,6 +9,7 @@ import { seedSyntheticLeague, SYNTHETIC_ANCHORS } from "../../src/integrations/c
 import { createGame } from "../../src/server/services/create-game";
 import { processNextMatchday } from "../../src/server/services/matchday";
 import { ensureContractTalks } from "../../src/server/services/career";
+import { getTodayItems } from "../../src/server/today-queries";
 import { asUser, createUser, freshDb } from "../support/db";
 
 const DB = "touchline_it_cups";
@@ -75,6 +76,14 @@ describe("cups & careers", () => {
     await as(A, `select public.release_prospect($1)`, [mine[1].id]);
     await expect(as(A, `select public.promote_prospect($1)`, [mine[1].id])).rejects.toThrow(/já não está/);
     await expect(as(B, `select public.promote_prospect($1)`, [mine[2].id])).rejects.toThrow(/inexistente/);
+
+    // UI v2 "Por decidir" drawer: one RLS query, grouped per kind, only the caller's club
+    (globalThis as unknown as { __touchlinePool?: Pool }).__touchlinePool = pool;
+    const today = await getTodayItems(A, gameId, clubA);
+    expect(today.filter((i) => i.kind === "academy")).toHaveLength(1);
+    expect(today.filter((i) => i.kind === "contract").length).toBeLessThanOrEqual(1);
+    expect(today.every((i) => i.href.startsWith(`/g/${gameId}/`))).toBe(true);
+    expect(await getTodayItems(B, gameId, clubA)).toEqual([]);
   });
 
   it("season end: unrenewed contracts leave as free agents; the window lets humans sign them, then the AI takes the rest", async () => {

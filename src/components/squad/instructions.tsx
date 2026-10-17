@@ -50,7 +50,7 @@ export function InstructionsTab({ gameId, squad, st, locked, presets, onTactics,
                 {t.opts.map(([v, l]) => (
                   <button key={v} type="button" role="radio" aria-checked={st.tactics[t.key] === v} disabled={locked}
                     onClick={() => onTactics({ ...st.tactics, [t.key]: v } as Tactics)}
-                    className={cn("rounded-lg px-2 py-2 text-xs font-bold transition", st.tactics[t.key] === v ? "bg-accent text-accent-ink shadow-[0_0_18px_-6px_rgb(212_255_58/.7)]" : "text-muted hover:bg-surface-2 hover:text-ink")}>{l}</button>
+                    className={cn("rounded-lg px-2 py-2 text-xs font-bold transition", st.tactics[t.key] === v ? "bg-accent text-accent-ink" : "text-muted hover:bg-surface-2 hover:text-ink")}>{l}</button>
                 ))}
               </div>
               <p className="mt-1 text-[11px] text-faint">{t.help}</p>

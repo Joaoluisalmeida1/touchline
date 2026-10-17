@@ -41,7 +41,7 @@ export function MatchAnalysis({ events, home, away }: { events: AnEvent[]; home:
         <path d={path(series.home)} fill="none" stroke={colorOf(home.color)} strokeWidth="2.5" />
         <path d={path(series.away)} fill="none" stroke={colorOf(away.color)} strokeWidth="2.5" />
         {goalDots.map(({ x, v, s }, i) => (
-          <circle key={i} cx={X(x)} cy={Y(v)} r="5" fill="#d4ff3a" stroke="#07090b" strokeWidth="2">
+          <circle key={i} cx={X(x)} cy={Y(v)} r="5" fill="var(--color-accent)" stroke="var(--color-surface)" strokeWidth="2">
             <title>{`${s.minute}' golo de ${s.player ?? "?"} (xG ${s.xg!.toFixed(2)})`}</title>
           </circle>
         ))}

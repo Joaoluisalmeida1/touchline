@@ -47,7 +47,6 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
         {game.is_owner && game.status !== "finished" && game.status !== "archived" && (
           <StaggerItem>
             <Card glow className="overflow-hidden">
-              <div aria-hidden className="pointer-events-none absolute -right-10 -top-16 size-52 rounded-full bg-accent/10 blur-3xl" />
               <CardTitle icon={<Radio />}>Painel do criador</CardTitle>
               {game.status === "setup" ? (
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

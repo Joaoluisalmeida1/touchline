@@ -91,3 +91,12 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 - **Jovens da academia são fictícios** (nomes gerados, idades do jogo) — não violam a regra de nunca inventar idades de pessoas reais.
 - **Bosman só para clubes humanos**: a IA continua a renovar automaticamente para manter os plantéis estáveis; nunca se desce abaixo do plantel mínimo (os excedentes renovam automaticamente).
 - **Divisões/subidas e empréstimos passam para a fase 5**: exigem calendários e classificações por divisão e contratos temporários — mudanças estruturais que merecem um ramo próprio.
+
+### UI v2 — fundação (2026-10-17)
+
+- **Direção visual "Matchday editorial"** em vez de neon/futurista: o Joao rejeitou o neon por ser essencialmente o v1 (painéis escuros + lima). Mock clicável aprovado antes do código.
+- **Uma cor de marca fixa** (azul Touchline `#3a5bf0`; `#7690ff` como acento no tema escuro para passar AA) e cores dos clubes só em blocos (faixas, emblemas, marcadores).
+- **Archivo** como única família (largura variável para os títulos condensados); Barlow removida.
+- **Tema escuro por omissão**, com tema claro. Preferências por dispositivo (localStorage + script antes do primeiro paint), não na base de dados: evita escrever no servidor por um detalhe visual e mantém as páginas estáticas estáticas.
+- **Rotas inalteradas**: os 12 separadores passam a 5 hubs + Clube por cima das mesmas URLs, para não partir links, notificações push nem testes.
+- **"Por decidir" lê, não responde** nesta fase: a gaveta lista e liga a cada decisão; responder dentro da gaveta fica para `feat/ui-2-daily`.

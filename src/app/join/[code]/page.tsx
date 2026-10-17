@@ -19,7 +19,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
           <Card glow className="overflow-hidden p-7 text-center">
             <div aria-hidden className="pitch-grid pointer-events-none absolute inset-0" />
             <div className="relative">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-ink shadow-[0_10px_30px_-10px_rgb(212_255_58/.7)]"><Handshake className="size-6" /></span>
+              <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-ink"><Handshake className="size-6" /></span>
               <p className="eyebrow mt-6 justify-center">Convite recebido</p>
               <h1 className="headline mt-2 text-4xl">Foste convidado para uma liga</h1>
               <p className="mt-3 text-sm text-muted">Ao entrares, poderás escolher um clube que ainda não tenha treinador.</p>

@@ -19,7 +19,7 @@ export function PillTabs<K extends string>({ tabs, value, onChange, label, size 
   return (
     <LayoutGroup id={id}>
       <div role="tablist" aria-label={label}
-        className={cn("relative inline-flex items-center gap-0.5 rounded-xl border border-line bg-bg/70 p-1", stretch && "flex w-full", className)}>
+        className={cn("no-scrollbar relative inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[10px] border border-line bg-bg/70 p-1", stretch && "flex w-full", className)}>
         {tabs.map((t) => {
           const active = t.id === value;
           return (
@@ -27,7 +27,7 @@ export function PillTabs<K extends string>({ tabs, value, onChange, label, size 
               className={cn("relative rounded-lg font-semibold outline-none transition-colors", stretch && "flex-1",
                 size === "sm" ? "px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm",
                 active ? "text-accent-ink" : "text-muted hover:text-ink")}>
-              {active && <motion.span layoutId="pill" transition={pillSpring} className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_24px_-6px_rgb(212_255_58/.6)]" />}
+              {active && <motion.span layoutId="pill" transition={pillSpring} className="absolute inset-0 rounded-lg bg-accent" />}
               <motion.span className="relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap"
                 animate={{ filter: active ? ["blur(0px)", "blur(3px)", "blur(0px)"] : "blur(0px)" }} transition={{ duration: 0.28 }}>
                 {t.icon}{t.label}{t.badge}
@@ -56,7 +56,7 @@ export function NavTabs({ items, activeHref, label }: { items: { href: string; l
               {it.label}
               {active && (
                 <motion.span layoutId="underline" transition={pillSpring}
-                  className="absolute inset-x-2 -bottom-px h-[3px] rounded-full bg-accent shadow-[0_0_14px_rgb(212_255_58/.7)]" />
+                  className="absolute inset-x-2 -bottom-px h-[3px] rounded-full bg-accent" />
               )}
             </Link>
           );

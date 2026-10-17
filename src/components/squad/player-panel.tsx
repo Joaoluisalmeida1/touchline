@@ -67,7 +67,7 @@ export function PlayerPanel({ p, gameId, look, season, locked, slot, slotIndex, 
           <div className="grid gap-1.5">
             {rolesForSlot(slot).map((r) => (
               <button key={r.id} type="button" disabled={locked} onClick={() => onRole(slotIndex, r.id)}
-                className={cn("rounded-xl border px-3 py-2 text-left transition", role === r.id ? "border-accent/70 bg-accent/10 shadow-[0_0_0_3px_rgb(212_255_58/.1)]" : "border-line hover:border-line-strong hover:bg-surface-2")}>
+                className={cn("rounded-xl border px-3 py-2 text-left transition", role === r.id ? "border-accent/70 bg-accent/10" : "border-line hover:border-line-strong hover:bg-surface-2")}>
                 <span className="text-sm font-semibold">{r.label}</span>
                 <span className="block text-[11px] leading-4 text-muted">{r.description}</span>
               </button>

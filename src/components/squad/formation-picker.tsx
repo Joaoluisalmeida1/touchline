@@ -10,7 +10,7 @@ const GROUPS: { label: string; match: (f: Formation) => boolean }[] = [
   { label: "Linha de 3", match: (f) => f.startsWith("3") },
   { label: "Linha de 5", match: (f) => f.startsWith("5") },
 ];
-const DOT: Record<string, string> = { GK: "#ffd166", DEF: "#7dd3fc", MID: "#d4ff3a", ATT: "#fb7185" };
+const DOT: Record<string, string> = { GK: "#ffd166", DEF: "#7dd3fc", MID: "#8fd16a", ATT: "#fb7185" };
 
 export function FormationThumb({ f, size = 56 }: { f: Formation; size?: number }) {
   return (

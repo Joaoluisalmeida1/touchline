@@ -13,14 +13,14 @@ export function OvrChart({ points }: { points: { label: string; ovr: number }[] 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-40 w-full" role="img" aria-label={`Evolução do OVR de ${pts[0].ovr} para ${last.ovr}`}>
       <defs>
-        <linearGradient id="ovr-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4ff3a" stopOpacity=".25" /><stop offset="1" stopColor="#d4ff3a" stopOpacity="0" /></linearGradient>
+        <linearGradient id="ovr-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--color-accent)" stopOpacity=".25" /><stop offset="1" stopColor="var(--color-accent)" stopOpacity="0" /></linearGradient>
       </defs>
       {[min + 2, Math.round((min + max) / 2), max - 2].map((v) => (
         <g key={v}><line x1={padX} x2={w - padX} y1={y(v)} y2={y(v)} stroke="#232931" strokeDasharray="3 5" /><text x={2} y={y(v) + 4} fontSize="11" fontWeight="700" fill="#5d6772">{v}</text></g>
       ))}
       <path d={area} fill="url(#ovr-fill)" />
-      <path d={d} fill="none" stroke="#d4ff3a" strokeWidth="2.5" strokeLinejoin="round" />
-      {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.ovr)} r={i === pts.length - 1 ? 5 : 3.5} fill="#07090b" stroke="#d4ff3a" strokeWidth="2"><title>{`${p.label}: ${p.ovr}`}</title></circle>)}
+      <path d={d} fill="none" stroke="var(--color-accent)" strokeWidth="2.5" strokeLinejoin="round" />
+      {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.ovr)} r={i === pts.length - 1 ? 5 : 3.5} fill="var(--color-surface)" stroke="var(--color-accent)" strokeWidth="2"><title>{`${p.label}: ${p.ovr}`}</title></circle>)}
     </svg>
   );
 }
