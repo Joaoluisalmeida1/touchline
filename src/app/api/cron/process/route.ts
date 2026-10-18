@@ -18,9 +18,9 @@ function authorized(header: string | null, secret: string | undefined): boolean 
 }
 
 /**
- * Processes every daily-mode league whose deadline passed, one round per league per call. Triggered by the Vercel
- * cron (Hobby: 1×/day) and by the "Scheduled ops" GitHub workflow (every 15 min). Each game is idempotent and
- * lease-protected, so overlapping calls are safe. Responds 500 if any league failed, so schedulers and monitors notice.
+ * Processes every daily-mode league whose deadline passed, one round per league per call. Triggered once a day by the
+ * Vercel cron (vercel.json) — matchdays are deliberately daily. Each game is idempotent and lease-protected, so a manual
+ * call or an overlap is safe. Responds 500 if any league failed, so the failure shows in the Vercel cron logs.
  */
 export async function GET(req: NextRequest) {
   if (!authorized(req.headers.get("authorization"), serverEnv().CRON_SECRET)) {

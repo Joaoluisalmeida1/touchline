@@ -9,11 +9,26 @@ describe("pgPoolConfig", () => {
   });
 
   it("uses TLS for remote hosts and strips libpq-only params that pg would misread", () => {
-    const cfg = pgPoolConfig("postgresql://postgres.ref:pw@aws-0-eu-west-2.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&supa=x&application_name=touchline");
+    const cfg = pgPoolConfig("postgresql://postgres.ref:pw@aws-0-eu-west-2.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&supa=x&application_name=touchline", 5, undefined);
     expect(cfg.ssl).toEqual({ rejectUnauthorized: false });
     const url = new URL(cfg.connectionString!);
     expect([...url.searchParams.keys()]).toEqual(["application_name"]);
     expect(url.port).toBe("6543");
+  });
+
+  it("verifies the server certificate when a CA is configured (SUPABASE_DB_CA)", () => {
+    const pem = "-----BEGIN CERTIFICATE-----\\nMIIBfake\\n-----END CERTIFICATE-----";
+    const cfg = pgPoolConfig("postgresql://u:p@aws-1-eu-west-3.pooler.supabase.com:6543/postgres", 5, pem);
+    expect(cfg.ssl).toEqual({ ca: "-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----\n", rejectUnauthorized: true });
+    expect(pgPoolConfig("postgres://postgres@localhost:5432/db", 5, pem).ssl).toBeUndefined(); // never TLS to localhost
+  });
+
+  it("reads the CA from the environment by default", () => {
+    vi.stubEnv("SUPABASE_DB_CA", "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----");
+    expect(pgPoolConfig("postgresql://u:p@db.example.com/postgres").ssl).toMatchObject({ rejectUnauthorized: true });
+    vi.stubEnv("SUPABASE_DB_CA", "");
+    expect(pgPoolConfig("postgresql://u:p@db.example.com/postgres").ssl).toEqual({ rejectUnauthorized: false });
+    vi.unstubAllEnvs();
   });
 
   it("passes the pool size and an idle timeout", () => {

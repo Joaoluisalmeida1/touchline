@@ -7,13 +7,14 @@ Produção: Vercel `cdg1` + Supabase `eu-west-3` (Paris). Projeto, IDs e particu
 
 | Rotina | Onde | Frequência | Se falhar |
 |---|---|---|---|
-| Jornadas em modo diário | Vercel Cron → `/api/cron/process` | 1×/dia (19:00 UTC, Hobby) | logs Vercel (`cron.run`) |
-| Health + jornadas | GitHub Actions *Scheduled ops* | a cada 15 min | e-mail do GitHub ao último editor do workflow |
+| Jornadas em modo diário | Vercel Cron → `/api/cron/process` | **1×/dia** (19:00 UTC ±59 min, Hobby) — de propósito | logs Vercel (`cron.run`, HTTP 500 se alguma liga falhar) |
+| Uptime (app + BD) | GitHub Actions *Uptime check* → `/api/health` | a cada 15 min | e-mail do GitHub ao último editor do workflow |
 | Backup cifrado + teste de restauro | GitHub Actions *Nightly backup* | diário 03:30 UTC | e-mail do GitHub; nada é guardado |
 | Alertas de erro do servidor | `src/instrumentation.ts` → webhook | por erro (máx. 1 por erro/rota em 10 min) | `alert.failed` nos logs |
 
-O processamento é idempotente e protegido por *lease*: Vercel Cron e Scheduled ops podem correr ao mesmo tempo. Cada
-chamada joga **uma jornada por liga**; uma liga atrasada recupera uma jornada por chamada (15 min).
+As jornadas são diárias por decisão de produto. Cada chamada do cron processa **todas** as ligas com prazo vencido
+(em lotes, até ~240 s) e joga **uma jornada por liga**. O processamento é idempotente e protegido por *lease*, por isso
+uma chamada manual (ou o botão do criador) ao mesmo tempo que o cron é segura.
 
 ## 2. Configuração (uma vez)
 
@@ -22,7 +23,6 @@ chamada joga **uma jornada por liga**; uma liga atrasada recupera uma jornada po
 | Nome | Tipo | Valor |
 |---|---|---|
 | `APP_BASE_URL` | Variable | `https://touchline-garagemonline.vercel.app` |
-| `CRON_SECRET` | Secret | o mesmo valor que está na Vercel |
 | `BACKUP_DB_URL` | Secret | connection string do **Session pooler** (porta 5432): `postgresql://postgres.<ref>:<password>@aws-1-eu-west-3.pooler.supabase.com:5432/postgres`. Não usar o transaction pooler (6543) nem a ligação direta (só IPv6; os runners do GitHub não têm IPv6). |
 | `BACKUP_AGE_RECIPIENT` | Variable | chave **pública** `age1…` (abaixo) |
 
@@ -42,12 +42,12 @@ Nota: o GitHub desativa workflows agendados num repo público após 60 dias sem 
 
 ### Site em baixo / `/api/health` devolve 503
 1. `curl https://<app>/api/health` — `db: "down"` → problema na BD; erro 5xx sem JSON → problema na app.
-2. **BD:** Supabase dashboard — projeto *paused*? (Free pausa após 7 dias sem atividade; o Scheduled ops evita isto) → *Restore project*. Password mudada? → Integrations → Vercel → *Resync environment variables* + Redeploy (`docs/HANDOFF.md`).
+2. **BD:** Supabase dashboard — projeto *paused*? (Free pausa após 7 dias sem atividade; o Uptime check evita isto) → *Restore project*. Password mudada? → Integrations → Vercel → *Resync environment variables* + Redeploy (`docs/HANDOFF.md`).
 3. **App:** Vercel → Deployments. Se começou com o último deploy: **Instant Rollback** para o anterior (segundos), investigar depois.
 
 ### Jornada não foi processada
-1. Actions → *Scheduled ops* → último run: o passo "Process due matchdays" mostra `processed`/`failed` e o erro por liga.
-2. `failed > 0`: o erro também está nos logs Vercel (`matchday.failed` com `game_id`). A *lease* é libertada no erro e a próxima chamada retoma a mesma jornada sem repetir jogos.
+1. Vercel → Logs, filtrar por `cron.run` (por volta das 19:00 UTC): mostra `processed`/`failed`; a resposta do cron (Vercel → Settings → Cron Jobs → View logs) traz o erro por liga.
+2. `failed > 0`: o erro também está nos logs Vercel (`matchday.failed` com `game_id`). A *lease* é libertada no erro e a próxima chamada (o cron do dia seguinte, ou forçar já — ponto 4) retoma a mesma jornada sem repetir jogos.
 3. Processo morreu a meio sem libertar a lease: expira em 4 min; a seguinte chamada retoma.
 4. Forçar agora: botão "Jogar jornada" (criador) ou `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/process`.
 
