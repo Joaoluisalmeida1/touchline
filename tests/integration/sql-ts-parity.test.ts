@@ -40,7 +40,7 @@ describe("security invariants", () => {
   });
 
   it("server-only commands are not executable by authenticated users", async () => {
-    for (const fn of ["create_game_tx(uuid, jsonb)", "begin_matchday(uuid, integer)", "finalize_fixture(uuid, jsonb)", "complete_matchday(uuid, integer, jsonb)", "end_season(uuid, jsonb)", "_ledger(uuid, uuid, text, bigint, text, text, integer, integer)", "_execute_transfer(uuid)"]) {
+    for (const fn of ["create_game_tx(uuid, jsonb)", "begin_matchday(uuid, integer)", "finalize_fixture(uuid, jsonb)", "complete_matchday(uuid, integer, jsonb)", "end_season(uuid, jsonb)", "_ledger(uuid, uuid, text, bigint, text, text, integer, integer)", "_execute_transfer(uuid)", "rate_limit_hit(text, integer, integer)"]) {
       const r = await pool.query(`select has_function_privilege('authenticated', 'public.${fn}', 'EXECUTE') ok`);
       expect([fn, r.rows[0].ok]).toEqual([fn, false]);
     }

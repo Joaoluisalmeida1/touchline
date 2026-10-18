@@ -45,6 +45,7 @@
 | `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron |
 | `NEXT_PUBLIC_APP_NAME` | opcional |
 | `AUTH_MODE` | **não definir** (default `supabase`). `dev` é recusado na Vercel. |
+| `SUPABASE_DB_CA` | opcional, recomendado — certificado raiz do Supabase (PEM; Database → SSL Configuration → Download certificate). Liga a verificação TLS da ligação à BD. Ativar primeiro em **Preview** (ver abaixo). |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | opcional — notificações push. Gerar com `npx web-push generate-vapid-keys` |
 | `VAPID_PRIVATE_KEY` | opcional, **secreto** — par da chave pública acima |
 | `VAPID_SUBJECT` | opcional, ex.: `mailto:teu-email@exemplo.pt` |
@@ -60,12 +61,20 @@
    E2E_BASE_URL=https://<app>.vercel.app npx playwright test   # requer confirmação de email desligada para contas de teste
    ```
 
+### Ativar a verificação do certificado da BD (`SUPABASE_DB_CA`)
+
+1. Supabase → Database → SSL Configuration → *Download certificate* (`prod-ca-2021.crt`).
+2. Vercel → Environment Variables → `SUPABASE_DB_CA` = conteúdo do ficheiro, **só em Preview**; fazer deploy de um branch.
+3. `curl https://<preview>/api/health` → `{"ok":true,"db":"up"}`. Se der `db: "down"` com erro de certificado nos logs, o certificado não corresponde ao pooler: remover a variável (a app volta a TLS sem verificação).
+4. Repetir em **Production** e confirmar que o aviso `db.tls_unverified` deixa de aparecer nos logs.
+
 ## 3. Checklist de segredos e segurança antes de convidar amigos
 
 - [ ] Nenhuma variável secreta com prefixo `NEXT_PUBLIC_` (`grep -r NEXT_PUBLIC_ .env*`).
 - [ ] `npm run build` e procurar a connection string no bundle: `grep -r "pooler.supabase" .next/static` → vazio.
 - [ ] Migration `0008` aplicada (privilégios de funções). Correr `npm run test:integration` localmente antes de cada migration nova.
 - [ ] Toda a tabela nova: `enable row level security` + `revoke all … from anon, authenticated` (o teste de invariantes falha se esquecer).
+- [ ] Configurações de GitHub, Supabase e Vercel do [`SECURITY.md`](../SECURITY.md) (secção *Settings that live outside the code*).
 - [ ] Backups: Supabase Pro faz backups diários; no Free exportar com `pg_dump` (ver operator guide).
 
 ## 4. Ambientes

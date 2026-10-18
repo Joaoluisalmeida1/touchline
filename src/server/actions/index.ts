@@ -11,6 +11,7 @@ import { z } from "zod";
 import { getPool, withUser } from "../db";
 import { domainError } from "../pg";
 import { requireUser, signIn, signOut, signUp } from "../auth";
+import { allow, clientIp, LIMITS, limitKey, RATE_LIMITED } from "../rate-limit";
 import { createGame, CreateGameInput } from "../services/create-game";
 import { processNextMatchday } from "../services/matchday";
 import { signExternalPlayer } from "../services/external-market";
@@ -42,6 +43,11 @@ const Credentials = z.object({
 export async function loginAction(_: ActionState, form: FormData): Promise<ActionState> {
   const parsed = Credentials.safeParse({ email: form.get("email"), password: form.get("password") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const ip = await clientIp();
+  if (!(await allow([
+    { key: limitKey("login:ip", ip), ...LIMITS.loginPerIp },
+    { key: limitKey("login:email", parsed.data.email), ...LIMITS.loginPerEmail },
+  ]))) return { error: RATE_LIMITED };
   const r = await signIn(parsed.data.email, parsed.data.password);
   if (r.error) return { error: r.error };
   const next = String(form.get("next") ?? "");
@@ -52,6 +58,7 @@ export async function signupAction(_: ActionState, form: FormData): Promise<Acti
   const parsed = Credentials.extend({ displayName: z.string().trim().min(2, "Nome demasiado curto.").max(40) })
     .safeParse({ email: form.get("email"), password: form.get("password"), displayName: form.get("displayName") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!(await allow([{ key: limitKey("signup:ip", await clientIp()), ...LIMITS.signupPerIp }]))) return { error: RATE_LIMITED };
   const r = await signUp(parsed.data.email, parsed.data.password, parsed.data.displayName);
   if (r.error) return { error: r.error };
   if (r.needsConfirmation) return { ok: true, message: "Conta criada. Confirma o email que te enviámos para entrar." };
@@ -85,6 +92,7 @@ export async function createGameAction(_: ActionState, form: FormData): Promise<
 export async function joinGameAction(_: ActionState, form: FormData): Promise<ActionState> {
   const user = await requireUser();
   const code = String(form.get("code") ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (!(await allow([{ key: limitKey("join:user", user.id), ...LIMITS.joinPerUser }]))) return { error: RATE_LIMITED };
   let gameId: string;
   try {
     gameId = await withUser(user.id, async (c) => (await c.query(`select public.join_game($1) g`, [code])).rows[0].g);

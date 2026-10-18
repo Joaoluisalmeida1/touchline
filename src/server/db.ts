@@ -20,6 +20,9 @@ export function getPool(): Pool {
     // Vercel Fluid compute: keep the instance alive until idle clients are closed, so suspended instances don't leave
     // connections open on the Supavisor pooler. No-op outside Vercel.
     attachDatabasePool(pool);
+    if (process.env.VERCEL && !process.env.SUPABASE_DB_CA) {
+      console.warn(JSON.stringify({ level: "warn", msg: "db.tls_unverified", hint: "set SUPABASE_DB_CA to verify the database certificate (docs/deployment.md)" }));
+    }
     globalForPg.__touchlinePool = pool;
   }
   return globalForPg.__touchlinePool;

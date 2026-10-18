@@ -14,6 +14,7 @@ import * as A from "../../src/server/actions";
 import { GET as health } from "../../src/app/api/health/route";
 import { GET as cron } from "../../src/app/api/cron/process/route";
 import { asUser as asUserProd } from "../../src/server/pg";
+import { LIMITS, limitKey, RATE_LIMITED } from "../../src/server/rate-limit";
 import { createUser, freshDb, LOCAL_PG } from "../support/db";
 
 const session = vi.hoisted(() => ({ user: null as { id: string; email: string | null } | null }));
@@ -196,6 +197,31 @@ describe("asUser (role impersonation)", () => {
     }
     // the role switch is transaction-local: the pooled connection is back to the owner role afterwards
     expect((await pool.query(`select current_user`)).rows[0].current_user).not.toBe("authenticated");
+  });
+});
+
+describe("rate limiting", () => {
+  const hit = async (key: string, limit: number) =>
+    (await pool.query<{ ok: boolean }>(`select public.rate_limit_hit($1, $2, 60) ok`, [key, limit])).rows[0].ok;
+
+  it("allows up to the limit per window, then refuses until the window expires", async () => {
+    expect([await hit("it:k", 2), await hit("it:k", 2), await hit("it:k", 2)]).toEqual([true, true, false]);
+    expect(await hit("it:other", 2)).toBe(true); // keys are independent
+    await pool.query(`update public.rate_limits set window_start = now() - interval '2 minutes' where key = 'it:k'`);
+    expect(await hit("it:k", 2)).toBe(true);
+  });
+
+  it("is server-only: signed-in users cannot call it or read the table", async () => {
+    await expect(asUserProd(pool, owner, (c) => c.query(`select public.rate_limit_hit('x', 1, 60)`))).rejects.toThrow(/permission denied/);
+    await expect(asUserProd(pool, owner, (c) => c.query(`select * from public.rate_limits`))).rejects.toThrow(/permission denied/);
+  });
+
+  it("joining a league is refused once the per-user limit is reached", async () => {
+    await pool.query(`insert into public.rate_limits (key, window_start, hits) values ($1, now(), $2)
+                        on conflict (key) do update set window_start = now(), hits = $2`, [limitKey("join:user", outsider), LIMITS.joinPerUser.limit]);
+    as(outsider);
+    expect(await A.joinGameAction({}, form({ code: invite }))).toEqual({ error: RATE_LIMITED });
+    expect(await Q.getGame(outsider, gameId)).toBeNull(); // did not join
   });
 });
 

@@ -3,6 +3,18 @@ import { expect, test } from "@playwright/test";
 /** Route guards: anonymous users are sent to /auth, signed-in users cannot see leagues or admin pages they don't belong to. */
 const stamp = Date.now().toString(36);
 
+test("security headers are sent and the framework is not advertised", async ({ request }) => {
+  for (const path of ["/", "/auth", "/api/health"]) {
+    const h = (await request.get(path)).headers();
+    expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(h["x-frame-options"]).toBe("DENY");
+    expect(h["x-content-type-options"]).toBe("nosniff");
+    expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(h["permissions-policy"]).toContain("camera=()");
+    expect(h["x-powered-by"]).toBeUndefined();
+  }
+});
+
 test("anonymous visitors are redirected to sign-in with a return path", async ({ page }) => {
   for (const path of ["/dashboard", "/games/new", "/admin/import"]) {
     await page.goto(path);

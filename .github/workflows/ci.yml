@@ -31,6 +31,31 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  audit:
+    name: Dependency audit (runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      # Fails on critical advisories in shipped (non-dev) dependencies; lower severities are reported in the summary.
+      # Known and accepted: high advisory in the PostCSS copy bundled by Next 15 (build-time only) — fixed by the
+      # Next 16 upgrade (SECURITY.md).
+      - name: Summary
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node -e '
+            const a = JSON.parse(require("fs").readFileSync("audit.json", "utf8"));
+            const v = a.metadata?.vulnerabilities ?? {};
+            const rows = ["critical", "high", "moderate", "low"].map((s) => `| ${s} | ${v[s] ?? 0} |`).join("\n");
+            const names = Object.values(a.vulnerabilities ?? {}).map((x) => `- \`${x.name}\` (${x.severity})`).join("\n");
+            console.log(`### Runtime dependency audit\n\n| Severity | Count |\n|---|---:|\n${rows}\n\n${names}`);
+          ' >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail on critical
+        run: npm audit --omit=dev --audit-level=critical
+
   integration:
     name: All tests + coverage (Postgres)
     runs-on: ubuntu-latest
