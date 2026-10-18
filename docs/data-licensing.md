@@ -28,6 +28,12 @@
 - Só se usam a API de pesquisa e o endpoint SPARQL oficiais, com User-Agent identificável e ≤ 1 pedido/s — nada de *scraping*.
 - Só se guarda a data de nascimento (e o QID) quando a correspondência é única; nunca se inventa nem se estima uma idade.
 
+## Cores dos clubes (Wikidata + Wikipedia)
+
+- Fonte principal: Wikidata "official color" (`P6364`) e o código hexadecimal de cada cor (`P465`) — **CC0**.
+- Fallback: cores do equipamento principal na caixa de informação do artigo da Wikipedia em inglês (`body1`/`shorts1`/`socks1`), lidas pela API oficial (secção 0, não *scraping* de HTML). O texto da Wikipedia é CC BY-SA, mas uma cor de equipamento é um facto, não expressão protegida; guardamos a proveniência (`colors_source.provider = "wikipedia_infobox"`, QID, data).
+- Só cores: nunca emblemas, logótipos nem imagens de equipamentos (os *patterns* da Wikipedia não são usados).
+
 ## Checklist antes de convidar amigos com dados reais
 
 - [ ] Plano PlayerElo adequado e resposta escrita sobre retenção/exibição em ligas privadas.
