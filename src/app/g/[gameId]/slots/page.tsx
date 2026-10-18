@@ -6,7 +6,7 @@ import { SlotMachine } from "@/components/slots/slot-machine";
 import { RARITY } from "@/components/slots/rarity";
 import { SlotSymbol } from "@/components/slots/symbols";
 import { Badge, Card, CardTitle, Empty, cn, eur } from "@/components/ui";
-import { DAILY_SPINS, PRIZES, PRIZE_LABEL, SKIN_LABEL, SPIN_COST_CENTS, type Rarity, type Symbol } from "@/engine/slots/slots";
+import { PRIZES, PRIZE_LABEL, SKIN_LABEL, SPIN_COST_CENTS, type Rarity, type Symbol } from "@/engine/slots/slots";
 import { activateCardAction, closeDuelAction, createDuelAction, equipSkinAction, setFunSettingsAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
 import { getSlotsView } from "@/server/fun-queries";
@@ -38,7 +38,7 @@ export default async function SlotsPage({ params }: { params: Promise<{ gameId: 
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow mb-2">Hoje · {DAILY_SPINS} giros por dia · {eur(SPIN_COST_CENTS)} cada</p>
+          <p className="eyebrow mb-2">Hoje · giros ilimitados · {eur(SPIN_COST_CENTS)} cada</p>
           <h2 className="headline text-4xl sm:text-5xl">Roleta da Liga</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">Dinheiro, emblemas, cartas e até jogadores — ou uma lesão, uma multa, um castigo. 20% de cada giro e todas as multas vão para o jackpot.</p>
         </div>
@@ -46,7 +46,7 @@ export default async function SlotsPage({ params }: { params: Promise<{ gameId: 
       </header>
 
       {me ? (
-        <SlotMachine gameId={gameId} potCents={pot} spinsLeft={DAILY_SPINS - me.spins_today} freeSpins={me.free_spins} dailySpins={DAILY_SPINS}
+        <SlotMachine gameId={gameId} potCents={pot} spinsToday={me.spins_today} freeSpins={me.free_spins}
           canAfford={Number(me.available) >= SPIN_COST_CENTS} />
       ) : <Empty title="Escolhe um clube para jogar" />}
 

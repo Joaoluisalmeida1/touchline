@@ -115,8 +115,8 @@ function Confetti({ burst, colors }: { burst: number; colors: string[] }) {
 }
 
 /* ------------------------------------------------------------------ cabinet */
-export function SlotMachine({ gameId, potCents, spinsLeft, freeSpins, canAfford, dailySpins }: {
-  gameId: string; potCents: number; spinsLeft: number; freeSpins: number; canAfford: boolean; dailySpins: number;
+export function SlotMachine({ gameId, potCents, spinsToday, freeSpins, canAfford }: {
+  gameId: string; potCents: number; spinsToday: number; freeSpins: number; canAfford: boolean;
 }) {
   const [state, action] = useActionState(spinAction, {} as ActionState);
   const [spinning, setSpinning] = useState(false);
@@ -183,7 +183,7 @@ export function SlotMachine({ gameId, potCents, spinsLeft, freeSpins, canAfford,
     startTransition(() => action(fd));
   };
 
-  const disabled = spinning || (freeSpins === 0 && (spinsLeft <= 0 || !canAfford));
+  const disabled = spinning || (freeSpins === 0 && !canAfford);
   const r = result ? RARITY[result.rarity] : null;
   const bulbs = 22;
 
@@ -237,7 +237,7 @@ export function SlotMachine({ gameId, potCents, spinsLeft, freeSpins, canAfford,
             {spinning ? "A girar…" : freeSpins > 0 ? "Giro grátis!" : `Girar · ${eur(50_000_000)}`}
           </button>
           <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-bold text-[#f5c2cf]">
-            <span className="rounded-full bg-black/30 px-3 py-1">{Math.max(0, spinsLeft)}/{dailySpins} giros hoje</span>
+            <span className="rounded-full bg-black/30 px-3 py-1">{spinsToday} {spinsToday === 1 ? "giro" : "giros"} hoje</span>
             {freeSpins > 0 && <span className="rounded-full bg-[#2fbf6a] px-3 py-1 text-[#06240f]">{freeSpins} grátis</span>}
             {!canAfford && freeSpins === 0 && <span className="rounded-full bg-black/30 px-3 py-1">Sem €500 000 disponíveis</span>}
             <button type="button" onClick={toggleMute} aria-label={muted ? "Ligar som" : "Desligar som"} className="flex size-8 items-center justify-center rounded-full bg-black/30 text-[#ffd76a]">

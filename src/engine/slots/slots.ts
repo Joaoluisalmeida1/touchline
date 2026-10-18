@@ -7,7 +7,6 @@ import type { PositionGroup } from "../common/types";
 
 export const SLOTS_VERSION = "slots-v1";
 export const SPIN_COST_CENTS = 50_000_000; // €500k
-export const DAILY_SPINS = 5;
 export const JACKPOT_SHARE = 0.2;
 export const JACKPOT_BASE_CENTS = 200_000_000; // €2M
 export const DUEL_STAKE_CENTS = 50_000_000;

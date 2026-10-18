@@ -11,7 +11,7 @@ import { seedSyntheticLeague, SYNTHETIC_ANCHORS } from "../../src/integrations/c
 import { createGame } from "../../src/server/services/create-game";
 import { processNextMatchday } from "../../src/server/services/matchday";
 import { acceptDuel, applyCards, placeBet, spin } from "../../src/server/services/fun";
-import { DAILY_SPINS, JACKPOT_BASE_CENTS, SPIN_COST_CENTS } from "../../src/engine/slots/slots";
+import { JACKPOT_BASE_CENTS, SPIN_COST_CENTS } from "../../src/engine/slots/slots";
 import { asUser, createUser, freshDb } from "../support/db";
 
 const DB = "touchline_it_fun";
@@ -45,21 +45,20 @@ const pot = async () => Number((await pool.query(`select pot_cents from slots_po
 const as = (u: string, sql: string, args: unknown[]) => asUser(pool, u, (c) => c.query(sql, args));
 
 describe("roleta", () => {
-  it("costs €500k, feeds the jackpot, pays cash prizes and respects the daily limit", async () => {
+  it("costs €500k, feeds the jackpot, pays cash prizes and has no daily limit", async () => {
     const before = await cash(clubA);
     const out = await spin(pool, A, gameId, { prize: "cash_mid" });
     expect(out.reels.length).toBe(3);
     expect(await cash(clubA)).toBe(before - SPIN_COST_CENTS + out.amount_cents!);
     expect(await pot()).toBe(JACKPOT_BASE_CENTS + SPIN_COST_CENTS * 0.2);
-    for (let i = 1; i < DAILY_SPINS; i++) await spin(pool, A, gameId, { prize: "cash_small" });
-    await expect(spin(pool, A, gameId)).rejects.toThrow(/giros de hoje/);
-    // a free-spin card goes beyond the limit and costs nothing
+    for (let i = 1; i < 8; i++) await spin(pool, A, gameId, { prize: "cash_small" });
+    // a free-spin card costs nothing
     await pool.query(`insert into slot_cards (game_id, club_id, kind) values ($1, $2, 'free_spin')`, [gameId, clubA]);
     const c0 = await cash(clubA);
     const free = await spin(pool, A, gameId, { prize: "morale" });
     expect(free.free).toBe(true);
     expect(await cash(clubA)).toBe(c0);
-    expect(await n(`select count(*) n from slot_spins where club_id = $1`, [clubA])).toBe(DAILY_SPINS + 1);
+    expect(await n(`select count(*) n from slot_spins where club_id = $1`, [clubA])).toBe(9);
   });
 
   it("player, skin, cards and jackpot prizes", async () => {
