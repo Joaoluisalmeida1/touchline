@@ -1,11 +1,14 @@
-import { Building2, Construction, Handshake, Landmark, Star, Ticket, Users } from "lucide-react";
+import { Building2, Construction, FileSignature, GraduationCap, Handshake, Landmark, Star, Ticket, Users } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { SectionTabs } from "@/components/club/section-tabs";
-import { Badge, Card, CardTitle, Empty, Stat, cn, eur } from "@/components/ui";
+import { Badge, Card, CardTitle, Empty, PosPill, Stat, cn, eur } from "@/components/ui";
 import {
   BOARD, DEAL_KIND, SLOTS, STAFF, UPGRADES, matchdayGate, ticketPriceEur, type Slot, type StaffRole, type TicketPrice,
 } from "@/engine/economy/business";
-import { hireStaffAction, setBudgetShiftAction, setTicketPriceAction, signSponsorAction, startUpgradeAction } from "@/server/actions";
+import { hireStaffAction, promoteProspectAction, releaseProspectAction, renewContractAction, setBudgetShiftAction, setTicketPriceAction, signSponsorAction, startUpgradeAction } from "@/server/actions";
+import { getAcademy, getContractTalks } from "@/server/career-queries";
+import { ensureContractTalks } from "@/server/services/career";
+import { academyIntakeRound } from "@/engine/career/career";
 import { requireUser } from "@/server/auth";
 import { getClubOffice } from "@/server/club-queries";
 import { getPool } from "@/server/db";
@@ -13,7 +16,7 @@ import { ensureBusiness } from "@/server/services/business";
 
 export const metadata = { title: "Clube" };
 type Office = NonNullable<Awaited<ReturnType<typeof getClubOffice>>>;
-type Tab = "direcao" | "patrocinios" | "estadio" | "staff";
+type Tab = "direcao" | "patrocinios" | "estadio" | "staff" | "formacao" | "contratos";
 
 const PRICE: { id: TicketPrice; label: string; hint: string }[] = [
   { id: "low", label: "Baixo", hint: "Mais público, adeptos contentes (+1 humor/jornada)" },
@@ -26,11 +29,15 @@ export default async function ClubPage({ params, searchParams }: { params: Promi
   const sp = await searchParams;
   const user = await requireUser();
   await ensureBusiness(getPool(), gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "business.ensure_failed", error: (e as Error).message })));
+  await ensureContractTalks(getPool(), gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "career.talks_failed", error: (e as Error).message })));
   const o = await getClubOffice(user.id, gameId);
   if (!o) return <Empty title="Ainda não tens clube">Escolhe um clube no Resumo.</Empty>;
   if (o.status !== "active" || !o.board || !o.biz) return <Empty title="A liga ainda não começou" icon={<Landmark />}>A direção define objetivos e orçamento quando a liga arrancar.</Empty>;
   const openSlots = new Set(o.offers.map((x) => x.slot)).size;
-  const initial: Tab = (["direcao", "patrocinios", "estadio", "staff"] as const).find((t) => t === sp.tab) ?? (openSlots ? "patrocinios" : "direcao");
+  const [academy, talks] = await Promise.all([getAcademy(user.id, o.club), getContractTalks(user.id, o.club, o.current_season)]);
+  const waiting = academy.filter((x) => x.status === "academy").length;
+  const openTalks = talks.filter((t) => t.status === "open" && !t.refuses).length;
+  const initial: Tab = (["direcao", "patrocinios", "estadio", "staff", "formacao", "contratos"] as const).find((t) => t === sp.tab) ?? (openSlots ? "patrocinios" : "direcao");
   return (
     <div className="space-y-5">
       <header>
@@ -40,7 +47,10 @@ export default async function ClubPage({ params, searchParams }: { params: Promi
       <SectionTabs<Tab> label="Clube" initial={initial} tabs={[
         { id: "direcao", label: "Direção" }, { id: "patrocinios", label: "Patrocínios", badge: openSlots },
         { id: "estadio", label: "Estádio" }, { id: "staff", label: "Staff" },
+        { id: "formacao", label: "Formação", badge: waiting }, { id: "contratos", label: "Contratos", badge: openTalks },
       ]} panels={{
+        formacao: <Academy gameId={gameId} rows={academy} intake={academyIntakeRound(o.rounds)} />,
+        contratos: <Contracts gameId={gameId} rows={talks} season={o.current_season} />,
         direcao: <Board o={o} gameId={gameId} />,
         patrocinios: <Sponsors o={o} gameId={gameId} />,
         estadio: <Stadium o={o} gameId={gameId} />,
@@ -312,5 +322,66 @@ function Stars({ n }: { n: number }) {
     <span className="inline-flex gap-0.5" aria-label={`Nível ${n} de 5`}>
       {[1, 2, 3, 4, 5].map((i) => <Star key={i} className={cn("size-3.5", i <= n ? "fill-accent text-accent" : "text-line-strong")} />)}
     </span>
+  );
+}
+
+function Academy({ gameId, rows, intake }: { gameId: string; rows: Awaited<ReturnType<typeof getAcademy>>; intake: number }) {
+  const waiting = rows.filter((x) => x.status === "academy");
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">Todas as épocas, depois da jornada {intake}, a academia apresenta 3 a 6 jovens (16–18 anos). Mais jovens e melhores com um coordenador da formação de nível alto. Os jovens são fictícios — nomes e idades gerados pelo jogo.</p>
+      {waiting.length === 0 ? <Empty title="Academia vazia" icon={<GraduationCap />}>Os próximos jovens chegam depois da jornada {intake}.</Empty> : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {waiting.map((x) => (
+            <Card key={x.id}>
+              <div className="flex items-center gap-3">
+                <span className="flex size-11 items-center justify-center rounded-xl bg-surface-2 font-display text-xl font-extrabold tabular ring-1 ring-line">{x.ovr}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{x.name}</p>
+                  <p className="text-xs text-muted"><PosPill group={x.position_group} /> · {x.age} anos · potencial <b className="text-ink">{x.potential_band}</b> · {eur(Number(x.wage_cents))}/jornada</p>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <ActionForm action={promoteProspectAction} hidden={{ gameId, prospectId: x.id }} submitLabel="Promover" inline submitClassName="min-h-9" />
+                <ActionForm action={releaseProspectAction} hidden={{ gameId, prospectId: x.id }} submitLabel="Dispensar" variant="ghost" inline submitClassName="min-h-9" confirm={`Dispensar ${x.name}?`} />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-faint">Promovido: contrato de 3 épocas. Os jovens não promovidos ficam na academia (a IA dispensa os seus no fim da época).</p>
+    </div>
+  );
+}
+
+function Contracts({ gameId, rows, season }: { gameId: string; rows: Awaited<ReturnType<typeof getContractTalks>>; season: number }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">Jogadores no último ano de contrato (termina no fim da época {season}). Sem renovação, saem a custo zero e ficam livres para qualquer clube nas primeiras 3 jornadas da época seguinte.</p>
+      {rows.length === 0 ? <Empty title="Nenhum contrato a terminar" icon={<FileSignature />} /> : (
+        <div className="space-y-3">
+          {rows.map((t) => (
+            <Card key={t.id} className={cn(t.status !== "open" && "opacity-70")}>
+              <div className="flex flex-wrap items-center gap-3">
+                <PosPill group={t.position_group} />
+                <p className="flex-1 font-bold">{t.name} <span className="ml-1 font-display text-faint">{t.current_ovr}</span></p>
+                <span className="text-xs text-muted">Agora: {eur(Number(t.wage_cents))}/jornada</span>
+                {t.status === "renewed" ? <Badge tone="accent">Renovado · {t.chosen?.seasons} {t.chosen?.seasons === 1 ? "época" : "épocas"}</Badge>
+                  : t.status === "left" ? <Badge>Saiu</Badge> : t.refuses ? <Badge tone="danger">Não quer renovar</Badge> : <Badge tone="warn" dot>Por decidir</Badge>}
+              </div>
+              {t.status === "open" && !t.refuses && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {t.options.map((op) => (
+                    <ActionForm key={op.seasons} action={renewContractAction} hidden={{ gameId, talkId: t.id, seasons: String(op.seasons) }} inline variant="secondary" submitClassName="min-h-9"
+                      submitLabel={`${op.seasons} ${op.seasons === 1 ? "época" : "épocas"} · ${eur(op.wage_cents)}/jornada`} />
+                  ))}
+                </div>
+              )}
+              {t.status === "open" && t.refuses && <p className="mt-2 text-xs text-muted">Está descontente ou quer outro desafio. Melhor vender antes do fim da época.</p>}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

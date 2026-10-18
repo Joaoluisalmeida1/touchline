@@ -244,7 +244,7 @@ describe("season rollover & isolation", () => {
     const s1 = await q<{ status: string; summary_json: { champion_club_id: string } }>(`select status, summary_json from seasons where game_id = $1 and number = 1`, [gameId]);
     expect(s1[0].status).toBe("completed");
     expect(s1[0].summary_json.champion_club_id).toBeTruthy();
-    expect((await q(`select * from club_ledger where game_id = $1 and event_type = 'prize_money'`, [gameId]))).toHaveLength(6);
+    expect((await q(`select * from club_ledger where game_id = $1 and event_type = 'prize_money' and idempotency_key like 'season:%'`, [gameId]))).toHaveLength(6);
     expect((await q(`select * from fixtures f join seasons s on s.id = f.season_id where s.game_id = $1 and s.number = 2`, [gameId]))).toHaveLength(30);
     const prog = await q<{ n: number }>(`select count(*)::int n from player_progression_log where game_id = $1`, [gameId]);
     expect(prog[0].n).toBeGreaterThan(0);

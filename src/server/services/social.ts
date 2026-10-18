@@ -46,7 +46,7 @@ async function ctxFor(c: PoolClient, gameId: string, clubId: string, userId: str
     `select count(*) n from public.board_state where club_id = $1 and final_position is not null and final_position <= (objective->>'target')::int`, [clubId])).rows[0].n);
   const facts = Object.fromEntries((await c.query<{ kind: string; n: string }>(
     `select kind, count(*) n from public.game_events where game_id = $1 and club_id = $2
-      and kind in ('comeback','late_winner','hat_trick','player_of_round','team_of_round') group by kind`, [gameId, clubId])).rows.map((r) => [r.kind, Number(r.n)]));
+      and kind in ('comeback','late_winner','hat_trick','player_of_round','team_of_round','cup_winner') group by kind`, [gameId, clubId])).rows.map((r) => [r.kind, Number(r.n)]));
   const tx = (await c.query<{ player_id: string; from_club_id: string | null; to_club_id: string | null; price_cents: string; completed_at: string; other_human: boolean; offer_id: string | null; swap: boolean }>(
     `select t.player_id, t.from_club_id, t.to_club_id, t.price_cents, t.completed_at, t.offer_id,
             exists (select 1 from public.transfer_offers o where o.id = t.offer_id and o.swap_player_id is not null) swap,
@@ -67,6 +67,7 @@ async function ctxFor(c: PoolClient, gameId: string, clubId: string, userId: str
   const cash = (await c.query<{ cash_cents: string; initial: string | null }>(
     `select cash_cents, (select amount_cents from public.club_ledger where club_id = $1 and event_type = 'initial_balance' limit 1) initial
        from public.game_clubs where id = $1`, [clubId])).rows[0];
+  const promoted = Number((await c.query(`select count(*) n from public.academy_prospects where club_id = $1 and status = 'promoted'`, [clubId])).rows[0].n);
   void userId;
   return {
     results, position: pos, round: at.round, champion_seasons: champions, objectives_met: objectives,
@@ -74,7 +75,7 @@ async function ctxFor(c: PoolClient, gameId: string, clubId: string, userId: str
     swaps: tx.filter((t) => t.swap).length, human_deals: tx.filter((t) => t.other_human && t.offer_id).length,
     fan_mood: biz?.fan_mood ?? null, confidence: conf?.confidence ?? null,
     upgrades_done: (biz?.upgrades ?? []).filter((u) => u.ready_at <= now).length,
-    press_answered: press, events_answered: office,
+    press_answered: press, events_answered: office, academy_promoted: promoted,
     cash_cents: Number(cash?.cash_cents ?? 0), initial_cash_cents: Number(cash?.initial ?? 0),
   };
 }

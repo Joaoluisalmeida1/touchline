@@ -527,3 +527,41 @@ export async function deleteWallPostAction(_: ActionState, form: FormData): Prom
     return fail(e);
   }
 }
+
+/* ------------------------------- cups & careers (phase 4b) ------------------------------- */
+export async function promoteProspectAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.promote_prospect($1)`, [uuid.parse(form.get("prospectId"))], "Promovido à equipa principal.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function releaseProspectAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.release_prospect($1)`, [uuid.parse(form.get("prospectId"))], "Dispensado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function renewContractAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    const seasons = z.coerce.number().int().min(1).max(3).parse(form.get("seasons"));
+    return userCommand(gameId, `select public.renew_contract($1, $2)`, [uuid.parse(form.get("talkId")), seasons], "Contrato renovado.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function signFreeAgentAction(_: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const gameId = uuid.parse(form.get("gameId"));
+    return userCommand(gameId, `select public.sign_free_agent($1)`, [uuid.parse(form.get("playerId"))], "Jogador livre contratado.");
+  } catch (e) {
+    return fail(e);
+  }
+}

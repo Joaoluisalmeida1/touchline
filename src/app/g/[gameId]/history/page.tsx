@@ -29,7 +29,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ gameId
         <CardTitle icon={<Trophy />}>Campeões</CardTitle>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {hof.champions.map((c) => (
-            <li key={c.season} className={cn("flex items-center gap-3 rounded-2xl border p-3", c.completed ? "border-gold/40 bg-gold/[.06]" : "border-line bg-bg/40")}>
+            <li key={c.season} className={cn("flex min-w-0 items-center gap-3 rounded-2xl border p-3", c.completed ? "border-gold/40 bg-gold/[.06]" : "border-line bg-bg/40")}>
               {crest(c.club_id, 40)}
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-faint">Época {c.season}</p>
@@ -132,7 +132,7 @@ export default async function HistoryPage({ params }: { params: Promise<{ gameId
           )}
           <div className="grid grid-cols-3 gap-2">
             {FEAT.map(([k, l]) => (
-              <div key={k} className="rounded-xl border border-line bg-bg/40 p-2 text-center">
+              <div key={k} className="min-w-0 rounded-xl border border-line bg-bg/40 p-2 text-center [overflow-wrap:anywhere]">
                 <p className="font-display text-2xl font-extrabold tabular">{hof.feats[k] ?? 0}</p>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l}</p>
               </div>

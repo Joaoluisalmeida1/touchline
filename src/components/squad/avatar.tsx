@@ -90,7 +90,7 @@ export function ClubBadge({ seed, name, short, primary, secondary, size = 36, cl
         {pattern === 2 && <path d="M-4 52 L52 -4 L68 8 L8 68 Z" fill={secondary} opacity=".9" />}
         {pattern === 3 && <path d="M0 26 L32 44 L64 26 L64 36 L32 54 L0 36 Z" fill={secondary} opacity=".9" />}
       </g>
-      <path d={shield} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="2.5" />
+      <path d={shield} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth="2" />
       <text x="32" y="33" textAnchor="middle" dominantBaseline="middle" fontSize={short.length > 3 ? 13 : 16} fontWeight="900"
         fill={pattern === 0 ? ink : "#fff"} stroke={pattern === 0 ? "none" : "rgba(0,0,0,.45)"} strokeWidth=".8" paintOrder="stroke"
         style={{ letterSpacing: "0.5px", fontFamily: "inherit" }}>{short.slice(0, 4).toUpperCase()}</text>

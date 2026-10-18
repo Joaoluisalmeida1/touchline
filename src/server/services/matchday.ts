@@ -18,6 +18,8 @@ import { flushPush } from "./push";
 import { prepareWeek } from "./week";
 import { afterRound, ensureBusiness, resolveSponsorDefaults, seasonClauses } from "./business";
 import { afterRoundSocial } from "./social";
+import { ensureCup, playDueCupRounds } from "./cup";
+import { academyAfterRound, aiSignFreeAgents, ensureContractTalks, seasonEndCareer } from "./career";
 import { absRound, stadiumFrom, type StaffRole, type Upgrade } from "../../engine/economy/business";
 
 export interface MatchdayResult {
@@ -137,6 +139,8 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     // club business: season setup (first time / new season) and default sponsor signings for this round
     await ensureBusiness(pool, gameId);
     await resolveSponsorDefaults(pool, gameId, season, round);
+    await ensureCup(pool, gameId);
+    await ensureContractTalks(pool, gameId);
     const state = await loadLeagueState(pool, gameId, { season, round });
     const outcome = processRound({
       gameId, season, round, clubs: state.clubs, players: state.players, fixtures: pending,
@@ -196,6 +200,19 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "business.after_round_failed", ...ctx, round, error: (e as Error).message }));
     }
+    // cup round(s) scheduled after this league round, then careers (academy intake, AI free-agent signings)
+    try {
+      const n = await playDueCupRounds(pool, gameId, season, round);
+      if (n) log("cup.played", { ...ctx, round, ties: n });
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "cup.failed", ...ctx, round, error: (e as Error).message }));
+    }
+    try {
+      await academyAfterRound(pool, gameId, season, round);
+      await aiSignFreeAgents(pool, gameId, season, round);
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "career.failed", ...ctx, round, error: (e as Error).message }));
+    }
     try {
       await afterRoundSocial(pool, gameId, season, round);
     } catch (e) {
@@ -233,6 +250,8 @@ export async function endSeason(pool: Pool, gameId: string) {
         where se.game_id = $1 and se.number = $2`, [gameId, g.rows[0].current_season]);
     return { season: g.rows[0].current_season as number, standings: s.rows as StandingRow[] };
   });
+  // Bosman: unrenewed contracts at human clubs end now (before the season-end updates are computed)
+  await seasonEndCareer(pool, gameId, season);
   const state = await loadLeagueState(pool, gameId);
   const end = seasonEnd({ gameId, season, standings, clubs: state.clubs, players: state.players });
   const table = (end.summary.table as { club_id: string }[]) ?? [];
@@ -242,6 +261,8 @@ export async function endSeason(pool: Pool, gameId: string) {
   ])).rows[0].r);
   // new season: board, budgets, staff pool and sponsor offers
   await ensureBusiness(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "business.season_setup_failed", game_id: gameId, error: (e as Error).message })));
+  await ensureCup(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "cup.season_setup_failed", game_id: gameId, error: (e as Error).message })));
+  await ensureContractTalks(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "career.talks_failed", game_id: gameId, error: (e as Error).message })));
   return r;
 }
 

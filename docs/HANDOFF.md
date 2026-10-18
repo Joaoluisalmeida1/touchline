@@ -125,6 +125,12 @@ Pitch with dnd-kit (Mouse+Touch+Keyboard sensors, `pointerWithin`, reduced autos
 
 ---
 
+### UI v2 (branch `feat/ui-1-foundation`, 2026-10-17)
+
+- Direction approved by Joao: **"Matchday editorial"** (not neon), one fixed brand colour (Touchline blue `#3a5bf0`), **Archivo** only, **dark theme default** + light theme. Plan doc "Touchline — UI Revamp Plan" and clickable mock "Touchline — Hoje & Match Centre mock" (Claude artifacts).
+- Foundation done: theme tokens, game shell (rail, context bar, five-hub dock, "Por decidir" drawer, ⌘K palette), flat OVR tiers. Next branches: `feat/ui-2-daily` (Hoje hero + inline decisions, Equipa), `feat/ui-3-matchday` (match centre replay, Liga), `feat/ui-4-club-social`.
+- See `docs/design-system.md`; `tests/e2e/screens.spec.ts` screenshots every route in both themes at 360/1440.
+
 ## 6. How to run things
 
 **Local (on user's PC, for CLI only):**

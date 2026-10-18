@@ -35,7 +35,7 @@ export function PitchToken({ p, slot, role, captain, selected, look, compact }: 
   const roleLabel = role ? ROLE_BY_ID[role]?.label : undefined;
   return (
     <div className={cn("group relative flex w-[76px] flex-col items-center transition-transform duration-200 sm:w-24", selected && "-translate-y-1 scale-110")}>
-      <div className={cn("relative rounded-full ring-2 ring-offset-2 ring-offset-pitch transition", selected ? "ring-white shadow-[0_0_24px_4px_rgb(212_255_58/.55)]" : fitTone(fit))}>
+      <div className={cn("relative rounded-full ring-2 ring-offset-2 ring-offset-pitch transition", selected ? "ring-white" : fitTone(fit))}>
         <Shirt primary={look.primary} secondary={look.secondary} number={p.shirt} size={compact ? 34 : 40} />
         {captain && <span className="absolute -left-2 -top-1.5 flex size-4 items-center justify-center rounded-full bg-gold font-display text-[10px] font-extrabold text-[#2a1a00] ring-2 ring-pitch" title="Capitão">C</span>}
         {p.fitness < 70 && <span className="absolute -right-2 -top-1.5 rounded-full bg-danger px-1 font-display text-[10px] font-bold text-white ring-2 ring-pitch" title={`Condição ${p.fitness}%`}>{p.fitness}</span>}
@@ -59,7 +59,7 @@ export function Pitch({ squad, st, look, selected, locked, onSlotClick }: {
   const coords = slotCoordinates(st.formation as Formation);
   return (
     <div className="relative mx-auto aspect-[68/90] w-full max-w-[540px] select-none overflow-hidden rounded-[26px] border border-white/10 bg-[repeating-linear-gradient(0deg,#123a26_0,#123a26_9%,#0f3220_9%,#0f3220_18%)] shadow-[0_30px_80px_-30px_rgb(0_0_0/.9),inset_0_0_80px_rgb(0_0_0/.55)]">
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_40%,rgb(212_255_58/.08),transparent_60%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0" />
       <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 68 90" preserveAspectRatio="none" aria-hidden>
         <g fill="none" stroke="rgba(255,255,255,.38)" strokeWidth=".35">
           <rect x="2" y="2" width="64" height="86" rx=".5" />
@@ -103,7 +103,7 @@ export function PlayerChip({ p, look, selected, sub, right }: { p: SquadP; look:
   const unavailable = p.injured > 0 || p.suspended > 0;
   return (
     <div className={cn("flex items-center gap-2.5 rounded-xl border px-2 py-1.5 transition",
-      selected ? "border-accent/70 bg-accent/10 shadow-[0_0_0_3px_rgb(212_255_58/.12)]" : "border-line bg-bg/60 hover:border-line-strong hover:bg-surface-2", unavailable && "opacity-55")}>
+      selected ? "border-accent/70 bg-accent/10" : "border-line bg-bg/60 hover:border-line-strong hover:bg-surface-2", unavailable && "opacity-55")}>
       <PlayerAvatar id={p.id} primary={look.primary} secondary={look.secondary} size={30} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold leading-5">

@@ -63,10 +63,10 @@ export default async function Finances({ params }: { params: Promise<{ gameId: s
           <CardTitle>Evolução do saldo</CardTitle>
           <svg viewBox={`0 0 ${w} ${h}`} className="h-32 w-full" preserveAspectRatio="none" role="img" aria-label="Evolução do saldo ao longo dos movimentos">
             <defs>
-              <linearGradient id="fin-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4ff3a" stopOpacity=".28" /><stop offset="1" stopColor="#d4ff3a" stopOpacity="0" /></linearGradient>
+              <linearGradient id="fin-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--color-accent)" stopOpacity=".28" /><stop offset="1" stopColor="var(--color-accent)" stopOpacity="0" /></linearGradient>
             </defs>
             <path d={`${path} L${w},${h} L0,${h} Z`} fill="url(#fin-fill)" />
-            <path d={path} fill="none" stroke="#d4ff3a" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </svg>
         </Card>
       )}

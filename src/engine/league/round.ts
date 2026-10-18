@@ -119,6 +119,41 @@ function sanitizeInstructions(ins: LineupInstructions | undefined, l: ResolvedLi
   return Object.keys(out).length ? out : undefined;
 }
 
+/** Resolve both lineups and build the engine input for one match (league or cup). */
+export function buildMatchInput(fixtureId: string, home: LeagueClub, away: LeagueClub, hs: LeaguePlayer[], as: LeaguePlayer[]) {
+  const hl = resolveLineup(hs.map(toSquad), home.saved_lineup, home.tactics.formation);
+  const al = resolveLineup(as.map(toSquad), away.saved_lineup, away.tactics.formation);
+  const byId = new Map([...hs, ...as].map((p) => [p.id, p]));
+  const team = (club: LeagueClub, l: ResolvedLineup, opp: LeagueClub, oppSquad: LeaguePlayer[]) => {
+    const mods = clubModifiers(club, opp);
+    const oppIds = new Set(oppSquad.map((p) => p.id));
+    const marking = (club.marking ?? []).filter((id) => oppIds.has(id)).slice(0, 2);
+    const own = new Set([...l.starters.map((s) => s.player_id), ...l.bench]);
+    const plans: MatchPlanRule[] = [];
+    for (const r of (club.plans ?? []).slice(0, 3)) {
+      const sub = r.sub && own.has(r.sub.out) && own.has(r.sub.in) ? r.sub : undefined;
+      if (!r.mentality && !sub) continue;
+      plans.push({ minute: r.minute, when: r.when, ...(r.mentality ? { mentality: r.mentality } : {}), ...(sub ? { sub } : {}) });
+    }
+    return {
+      club_id: club.id, name: club.name, formation: l.formation,
+      ...(mods ? { modifiers: mods } : {}),
+      ...(marking.length ? { marking } : {}),
+      ...(plans.length ? { plans } : {}),
+      ...(sanitizeInstructions(club.saved_lineup?.instructions, l) ? { instructions: sanitizeInstructions(club.saved_lineup?.instructions, l) } : {}),
+      tactics: {
+        mentality: club.tactics.mentality, tempo: club.tactics.tempo, pressing: club.tactics.pressing,
+        defensive_line: club.tactics.defensive_line, width: club.tactics.width,
+        passing_directness: club.tactics.passing_directness, transitions: club.tactics.transitions,
+      },
+      starters: l.starters.map((s) => toMatchPlayer(byId.get(s.player_id)!, s.slot, s.role)),
+      bench: l.bench.map((id) => toMatchPlayer(byId.get(id)!)),
+    };
+  };
+  const input: MatchInput = { fixture_id: fixtureId, home: team(home, hl, away, as), away: team(away, al, home, hs) };
+  return { input, hl, al, byId };
+}
+
 export function fixtureSeed(gameId: string, season: number, round: number, fixtureId: string): string {
   return `${gameId}|s${season}|r${round}|${fixtureId}`;
 }
@@ -146,36 +181,7 @@ export function processRound(args: {
     playing.add(away.id);
     const hs = squadOf(home.id);
     const as = squadOf(away.id);
-    const hl = resolveLineup(hs.map(toSquad), home.saved_lineup, home.tactics.formation);
-    const al = resolveLineup(as.map(toSquad), away.saved_lineup, away.tactics.formation);
-    const byId = new Map([...hs, ...as].map((p) => [p.id, p]));
-    const team = (club: LeagueClub, l: ResolvedLineup, opp: LeagueClub, oppSquad: LeaguePlayer[]) => {
-      const mods = clubModifiers(club, opp);
-      const oppIds = new Set(oppSquad.map((p) => p.id));
-      const marking = (club.marking ?? []).filter((id) => oppIds.has(id)).slice(0, 2);
-      const own = new Set([...l.starters.map((s) => s.player_id), ...l.bench]);
-      const plans: MatchPlanRule[] = [];
-      for (const r of (club.plans ?? []).slice(0, 3)) {
-        const sub = r.sub && own.has(r.sub.out) && own.has(r.sub.in) ? r.sub : undefined;
-        if (!r.mentality && !sub) continue;
-        plans.push({ minute: r.minute, when: r.when, ...(r.mentality ? { mentality: r.mentality } : {}), ...(sub ? { sub } : {}) });
-      }
-      return {
-      club_id: club.id, name: club.name, formation: l.formation,
-      ...(mods ? { modifiers: mods } : {}),
-      ...(marking.length ? { marking } : {}),
-      ...(plans.length ? { plans } : {}),
-      ...(sanitizeInstructions(club.saved_lineup?.instructions, l) ? { instructions: sanitizeInstructions(club.saved_lineup?.instructions, l) } : {}),
-      tactics: {
-        mentality: club.tactics.mentality, tempo: club.tactics.tempo, pressing: club.tactics.pressing,
-        defensive_line: club.tactics.defensive_line, width: club.tactics.width,
-        passing_directness: club.tactics.passing_directness, transitions: club.tactics.transitions,
-      },
-      starters: l.starters.map((s) => toMatchPlayer(byId.get(s.player_id)!, s.slot, s.role)),
-      bench: l.bench.map((id) => toMatchPlayer(byId.get(id)!)),
-      };
-    };
-    const input: MatchInput = { fixture_id: f.id, home: team(home, hl, away, as), away: team(away, al, home, hs) };
+    const { input, hl, al, byId } = buildMatchInput(f.id, home, away, hs, as);
     const seed = fixtureSeed(gameId, season, round, f.id);
     const input_hash = hashInput({ input, seed, engine: ENGINE_VERSION });
     const result = simulateMatch(input, seed);
