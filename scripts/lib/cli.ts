@@ -19,7 +19,12 @@ export const list = (name: string) => (arg(name) ?? "").split(",").map((s) => s.
 export function dbPool(): Pool {
   const url = resolveDbUrl();
   if (!url) throw new Error("SUPABASE_DB_URL (or POSTGRES_URL) is not set (see .env.example)");
-  return new Pool(pgPoolConfig(url, 3));
+  // CLIs spend minutes on HTTP between queries; the Supabase pooler may close idle connections meanwhile.
+  // keepAlive makes that rarer, and the handler drops a dead idle client instead of crashing the process
+  // (pg emits 'error' on the pool for idle clients; unhandled, Node exits). The next query opens a fresh connection.
+  const pool = new Pool({ ...pgPoolConfig(url, 3), keepAlive: true });
+  pool.on("error", (e) => console.error(`(db) idle connection dropped: ${e.message} — reconnecting on next query`));
+  return pool;
 }
 
 export function playerEloClient(): PlayerEloClient {
