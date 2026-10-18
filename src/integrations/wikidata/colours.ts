@@ -48,9 +48,14 @@ export function matchClubs(source: SourceClub[], candidates: WdClub[]): ClubMatc
     if (exact.length > 1) return { id: s.id, status: "ambiguous", candidates: exact };
     // token containment either way ("Wolves" won't match, "Wolverhampton" → "Wolverhampton Wanderers" will)
     const st = new Set(k.split(" "));
+    const sourceIsReserve = parentName(s.name) !== null;
     const near = [...new Set(names.filter((n) => n.keys.some((a) => {
+      // "Maritimo" must not land on "Marítimo B" just because the first team isn't in this league's list
+      if (!sourceIsReserve && parentName(a) !== null) return false;
       const at = a.split(" ");
-      return at.every((t) => st.has(t)) || [...st].every((t) => at.includes(t));
+      // dataset name inside a longer official name ("Inter" ⊂ "Inter Milan"), or a multi-word alias inside the dataset
+      // name; never a one-word alias inside it — "Central" or "Real" would match half a league ("Barracas Central")
+      return [...st].every((t) => at.includes(t)) || (at.length >= 2 && at.every((t) => st.has(t)));
     })).map((n) => n.c.qid))];
     if (near.length === 1) return { id: s.id, status: "matched", qid: near[0], by: "tokens" };
     return near.length ? { id: s.id, status: "ambiguous", candidates: near } : { id: s.id, status: "no_match" };

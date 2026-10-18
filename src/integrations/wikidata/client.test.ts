@@ -72,6 +72,32 @@ describe("WikidataClient.findLeague", () => {
   });
 });
 
+describe("WikidataClient.findClub", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const stub = () => vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url.includes("wbsearchentities")) {
+      return new Response(JSON.stringify({ search: [
+        { id: "Q1", label: "Vilaverdense FC", description: "Portuguese women's football club" },
+        { id: "Q2", label: "Marítimo B", description: "association football reserve team" },
+        { id: "Q3", label: "Vilaverdense FC", description: "Portuguese football club" },
+      ] }), { status: 200 });
+    }
+    // all three are football clubs
+    return new Response(JSON.stringify({ results: { bindings: ["Q1", "Q2", "Q3"].map((q) => ({ c: { value: `http://www.wikidata.org/entity/${q}` } })) } }), { status: 200 });
+  }));
+
+  it("skips women's, reserve and youth teams for a first-team name", async () => {
+    stub();
+    expect(await new WikidataClient("t", 0).findClub("Vilaverdense")).toBe("Q3");
+  });
+
+  it("allows them when the dataset name is itself a side team", async () => {
+    stub();
+    // no filtering for "… B": the first football-club hit wins, side teams included
+    expect(await new WikidataClient("t", 0).findClub("Marítimo B")).toBe("Q1");
+  });
+});
+
 describe("countryKey", () => {
   it("treats the home nations as the United Kingdom, as Wikidata does", () => {
     expect(countryKey("England")).toBe("united kingdom");
