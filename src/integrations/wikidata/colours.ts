@@ -89,6 +89,16 @@ export function contrast(a: string, b: string): number {
 }
 
 /**
+ * Two kit colours read as different: by brightness (contrast) OR by hue (RGB distance). Luminance alone calls red/green
+ * or blue/red "the same" (Estrela da Amadora, Paraná), which they clearly are not on a shirt.
+ */
+export function distinct(a: string, b: string): boolean {
+  const ch = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [x, y] = [ch(a), ch(b)];
+  return contrast(a, b) >= 1.5 || Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) >= 150;
+}
+
+/**
  * Wikidata's colour items carry pure web colours ("red" = #ff0000, "green" = #00ff00), which look neon next to real
  * kits. Those exact values are swapped for typical kit shades; any other hex (a specific shade) is kept as is.
  */
@@ -125,7 +135,7 @@ function fromOrdered(hexes: (string | null | undefined)[]): { primary: string; s
   const all = [...new Set(hexes.filter((h): h is string => !!h && HEX.test(h)).map(kitShade))];
   if (!all.length) return null;
   const primary = all[0];
-  const secondary = all.slice(1).find((h) => contrast(primary, h) >= 1.5)
+  const secondary = all.slice(1).find((h) => distinct(primary, h))
     ?? (contrast(primary, "#ffffff") >= contrast(primary, "#111827") ? "#ffffff" : "#111827");
   return { primary, secondary, all };
 }

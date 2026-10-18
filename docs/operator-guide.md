@@ -105,6 +105,15 @@ npm run wikidata:colours -- --leagues all --apply --update-games   # + recolore 
 - Proveniência em `source_clubs.metadata_json.colors_source` (`provider`, `qid`, `fetched_at`). Para fixar cores à mão: `colors_source.provider = "manual"` — o script nunca as sobrepõe (salvo `--force`).
 - Respostas em cache 7 dias em `data/wikidata-cache` (`--refresh` ignora a cache); ~4 pedidos por liga + 1 por clube que precise do fallback, ≥1,1 s entre pedidos. Idempotente.
 
+**Clubes sem dados** (nem Wikidata nem Wikipedia — p. ex. equipamentos desenhados como "branco + imagem"): cores estimadas à mão em [`scripts/catalog/colour-estimates.json`](../scripts/catalog/colour-estimates.json) (com `confidence`), aplicadas com:
+
+```bash
+npx tsx scripts/catalog/colour-estimates.ts                          # ensaio
+npx tsx scripts/catalog/colour-estimates.ts --apply --update-games   # grava (provider "estimate")
+```
+
+Nunca substituem cores com fonte nem "manual"; o `wikidata:colours` substitui uma estimativa assim que encontrar dados. Ordem depois de uma importação: `wikidata:colours --apply` primeiro, estimativas depois. Aplicado em produção a 2026-10-18: 274 clubes com fonte + 60 estimados (todos os 334).
+
 Ensaio com 6 ligas reais (47 clubes, 2026-10-18): 47/47 correspondências corretas, 45 com cores (30 Wikidata, 14 Wikipedia); sem dados: São Paulo, Borussia Mönchengladbach.
 
 ## Operação de ligas

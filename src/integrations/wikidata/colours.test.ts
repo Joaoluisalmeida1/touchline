@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coloursFromKit, contrast, kitShade, matchClubs, parentName, parseInfoboxKit, pickColours, toHex, type WdClub } from "./colours";
+import { coloursFromKit, contrast, distinct, kitShade, matchClubs, parentName, parseInfoboxKit, pickColours, toHex, type WdClub } from "./colours";
 
 const wd = (qid: string, label: string, aliases: string[] = []): WdClub => ({ qid, label, aliases });
 
@@ -115,6 +115,13 @@ describe("helpers", () => {
     expect(parentName("FC Porto II")).toBe("FC Porto");
     expect(parentName("Sporting U23")).toBe("Sporting");
     expect(parentName("Club Brugge")).toBeNull();
+  });
+
+  it("distinct accepts different hues of similar brightness, rejects near-identical shades", () => {
+    expect(distinct("#c8102e", "#00843d")).toBe(true); // red / green (Estrela da Amadora)
+    expect(distinct("#1e4fae", "#c8102e")).toBe(true); // blue / red (Paraná)
+    expect(distinct("#ffffff", "#fcfaf5")).toBe(false);
+    expect(distinct("#00843d", "#00843e")).toBe(false);
   });
 
   it("contrast is symmetric and maximal for black/white", () => {
