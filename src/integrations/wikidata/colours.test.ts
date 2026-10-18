@@ -34,6 +34,19 @@ describe("matchClubs", () => {
     expect(m("1. FC Schalke 04")).toMatchObject({ status: "matched", qid: "Q6" }); // dots and numbers
   });
 
+  it("never matches through a one-word alias contained in the dataset name", () => {
+    const arg = [wd("Q10", "Real Madrid", ["Real"]), wd("Q11", "Club Atlético Rosario Central", ["Central", "Rosario Central"])];
+    expect(matchClubs([{ id: "a", name: "Barracas Central" }], arg)[0].status).toBe("no_match");
+    expect(matchClubs([{ id: "b", name: "Real Sport Clube" }], arg)[0].status).toBe("no_match");
+    expect(matchClubs([{ id: "c", name: "Rosario Central" }], arg)[0]).toMatchObject({ status: "matched", qid: "Q11" });
+  });
+
+  it("never matches a first team to a reserve team by partial name", () => {
+    const seg = [wd("Q20", "C.S. Marítimo B"), wd("Q21", "Feirense")];
+    expect(matchClubs([{ id: "a", name: "Maritimo" }], seg)[0].status).toBe("no_match");
+    expect(matchClubs([{ id: "b", name: "Marítimo B" }], seg)[0]).toMatchObject({ status: "matched", qid: "Q20" });
+  });
+
   it("drops a match when two dataset clubs claim the same item", () => {
     const r = matchClubs([{ id: "a", name: "Benfica" }, { id: "b", name: "SL Benfica" }], league);
     expect(r.map((x) => x.status)).toEqual(["ambiguous", "ambiguous"]);

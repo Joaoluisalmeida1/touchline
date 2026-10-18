@@ -48,9 +48,11 @@ async function main() {
   try {
     const all = leagueRefs[0] === "all";
     const leagues = (await pool.query<{ id: string; external_id: string; name: string; country: string | null }>(
-      `select id, external_id, name, country from source_leagues
-        where provider <> 'synthetic' and ($1 or id::text = any($2) or external_id = any($2)) order by name`, [all, leagueRefs])).rows;
-    console.log(`${leagues.length} league(s)${apply ? "" : " — dry run, add --apply to write"}`);
+      `select l.id, l.external_id, l.name, l.country from source_leagues l
+        where l.provider <> 'synthetic' and ($1 or l.id::text = any($2) or l.external_id = any($2))
+          and exists (select 1 from source_clubs c where c.league_id = l.id) -- discovered-but-never-imported leagues: nothing to do
+        order by l.name`, [all, leagueRefs])).rows;
+    console.log(`${leagues.length} league(s) with clubs${apply ? "" : " — dry run, add --apply to write"}`);
 
     // ---- A. per league: match + Wikidata colours, Wikipedia kit as fallback ----
     for (const lg of leagues) {
@@ -115,6 +117,7 @@ async function main() {
       printTable(results.filter((r) => r.league === lg).map((r) => ({
         club: r.name,
         match: r.match.status === "matched" ? `${r.match.qid} ${r.wdLabel}`.trim() : r.match.status === "ambiguous" ? `ambiguous: ${r.match.candidates.slice(0, 3).join(" ")}` : "no match",
+        by: r.match.status === "matched" ? r.match.by : "", // "tokens" / "search" deserve a glance before --apply
         source: r.source ?? (r.match.status === "matched" ? "no colours" : "—"),
         primary: r.colours?.primary ?? "", secondary: r.colours?.secondary ?? "", detail: r.note,
       })));

@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ColourStatement, WdClub } from "./colours";
+import { parentName, type ColourStatement, type WdClub } from "./colours";
 import type { WdPerson } from "./match";
 
 const API = "https://www.wikidata.org/w/api.php";
@@ -15,6 +15,8 @@ const FOOTBALL_CLUB = "Q476028";
 const FOOTBALL_LEAGUE = "Q15991303";
 const LABEL_LANGS = `"en","pt","es","fr","de","it","nl","no","nb","mul"`;
 const isQid = (q: string) => /^Q\d+$/.test(q);
+/** Descriptions of teams that are not a club's first (men's) team: women's, reserve/B, youth/under-N. */
+const SIDE_TEAM = /\b(women|womens|ladies|feminin[oa]?|femenin[oa]?|reserves?|reserve team|youth|under[- ]?\d{2}|u-?\d{2})\b/i;
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 /** Dataset countries vs Wikidata's "country" (P17): the home nations are "United Kingdom" on Wikidata. */
 const UK = new Set(["england", "scotland", "wales", "northern ireland", "united kingdom", "uk", "great britain"]);
@@ -77,10 +79,16 @@ export class WikidataClient {
     return this.get(`${SPARQL}?format=json&query=${encodeURIComponent(q)}`, "application/sparql-results+json") as Promise<{ results: { bindings: Record<string, { value: string }>[] } }>;
   }
 
-  /** Football-club item for a club name (first search hit that is an association football club). */
+  /**
+   * Football-club item for a club name (first search hit that is an association football club). Women's, reserve and
+   * youth teams are skipped unless the name itself is one ("Vilaverdense" ≠ "Vilaverdense FC (women)", "Maritimo" ≠ "Marítimo B").
+   */
   async findClub(name: string): Promise<string | null> {
-    const s = (await this.get(`${API}?action=wbsearchentities&format=json&type=item&limit=8&language=en&uselang=en&search=${encodeURIComponent(name)}`, "application/json")) as { search?: { id: string }[] };
-    const ids = (s.search ?? []).map((x) => x.id).filter((id) => /^Q\d+$/.test(id));
+    const s = (await this.get(`${API}?action=wbsearchentities&format=json&type=item&limit=8&language=en&uselang=en&search=${encodeURIComponent(name)}`, "application/json")) as { search?: { id: string; label?: string; description?: string }[] };
+    const wantsSide = SIDE_TEAM.test(name) || parentName(name) !== null;
+    const ids = (s.search ?? [])
+      .filter((x) => wantsSide || !(SIDE_TEAM.test(x.description ?? "") || parentName(x.label ?? "") !== null))
+      .map((x) => x.id).filter((id) => /^Q\d+$/.test(id));
     if (!ids.length) return null;
     const r = await this.sparql(`SELECT ?c WHERE { VALUES ?c { ${ids.map((i) => `wd:${i}`).join(" ")} } ?c wdt:P31/wdt:P279* wd:Q476028 . }`);
     const ok = new Set(r.results.bindings.map((b) => b.c.value.split("/").pop()!));
