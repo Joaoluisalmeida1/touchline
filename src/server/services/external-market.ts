@@ -12,6 +12,9 @@ export type ExternalSignResult =
 
 export async function signExternalPlayer(pool: Pool, userId: string, gameId: string, sourcePlayerId: string, amountCents: number): Promise<ExternalSignResult> {
   return asService(pool, async (c) => {
+    // market-v2: players from other leagues are bought through the Transfer List only
+    const mode = (await c.query<{ m: string }>(`select coalesce(settings_json->>'market', 'osm') m from public.games where id = $1`, [gameId])).rows[0]?.m;
+    if (mode === "osm") await c.query(`select public._fail('ai_list_only', 'Os jogadores de outras ligas aparecem na Lista de Transferências.')`);
     const ctx = await c.query<{ ovr: number; reputation: number; season: number; profile: Record<string, unknown>; anchor: unknown }>(
       `select sp.initial_ovr ovr, gc.reputation, g.current_season season, sp.derived_profile_json profile,
               sp.derivation_json->'value_anchor_ratio' anchor

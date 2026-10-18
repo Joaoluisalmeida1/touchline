@@ -27,7 +27,7 @@ export default async function GameLayout({ children, params }: { children: React
       }}
       club={club && clubId ? {
         id: clubId, name: club.name_snapshot, short: club.short_name ?? club.name_snapshot.slice(0, 3),
-        primary: club.primary_color ?? "#64748b", secondary: club.secondary_color ?? "#ffffff",
+        primary: club.primary_color ?? "#64748b", secondary: club.secondary_color ?? "#ffffff", skin: club.crest_skin ?? null,
       } : null}
       today={today}
       players={players}

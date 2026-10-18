@@ -15,6 +15,8 @@ import { allow, clientIp, LIMITS, limitKey, RATE_LIMITED } from "../rate-limit";
 import { createGame, CreateGameInput } from "../services/create-game";
 import { processNextMatchday } from "../services/matchday";
 import { signExternalPlayer } from "../services/external-market";
+import { buyListing } from "../services/market";
+import { acceptDuel, placeBet, spin } from "../services/fun";
 import { deletePushSubscription, flushPush, savePushSubscription } from "../services/push";
 import { FORMATIONS, SLOTS } from "../../engine/common/types";
 
@@ -292,6 +294,100 @@ export async function signExternalAction(_: ActionState, form: FormData): Promis
   return { error: `Recusada. O clube pede €${(Number(res.counter_amount_cents) / 100).toLocaleString("pt-PT")}.`, data: { counter: Number(res.counter_amount_cents) / 100 } };
 }
 
+/** Buy a player from the Transfer List at the price shown (fails if the price changed meanwhile). */
+export async function buyListingAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const gameId = uuid.parse(form.get("gameId"));
+  const listingId = uuid.parse(form.get("listingId"));
+  const expected = z.coerce.number().int().positive().safeParse(form.get("priceCents"));
+  const key = z.string().min(8).max(100).safeParse(form.get("idempotencyKey"));
+  let res;
+  try {
+    res = await buyListing(getPool(), user.id, listingId, expected.success ? expected.data : null, key.success ? key.data : randomUUID());
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath(`/g/${gameId}`, "layout");
+  await pushNow();
+  if (res.player_id) redirect(`/g/${gameId}/players/${res.player_id}?toast=signed`);
+  return { ok: true, message: "Contratado! Já faz parte do teu plantel." };
+}
+
+/* ------------------------------- roleta, duelos, apostas ------------------------------- */
+/** One spin of the roleta (€500k, or a free-spin card). The outcome is decided on the server; the UI animates it. */
+export async function spinAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const gameId = uuid.parse(form.get("gameId"));
+  try {
+    const out = await spin(getPool(), user.id, gameId);
+    revalidatePath(`/g/${gameId}`, "layout");
+    if (out.rarity === "legendary" || out.prize === "jackpot") await pushNow();
+    return { ok: true, message: out.label, data: { outcome: out } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function createDuelAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const gameId = uuid.parse(form.get("gameId"));
+  const r = await userCommand(gameId, `select public.create_duel($1, $2)`, [gameId, uuid.parse(form.get("clubId"))], "Desafio enviado! €500 000 reservados.");
+  if (r.ok) await pushNow();
+  return r;
+}
+
+export async function closeDuelAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const gameId = uuid.parse(form.get("gameId"));
+  return userCommand(gameId, `select public.close_duel($1)`, [uuid.parse(form.get("duelId"))], "Duelo fechado.");
+}
+
+export async function acceptDuelAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const gameId = uuid.parse(form.get("gameId"));
+  try {
+    const r = await acceptDuel(getPool(), user.id, gameId, uuid.parse(form.get("duelId")));
+    revalidatePath(`/g/${gameId}`, "layout");
+    await pushNow();
+    return { ok: true, message: r.winner === "draw" ? "Empate! Ninguém paga." : r.winner === "opponent" ? "Ganhaste o duelo!" : "Perdeste o duelo…", data: { duel: r } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function equipSkinAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const gameId = uuid.parse(form.get("gameId"));
+  const skin = z.string().max(40).safeParse(form.get("skin"));
+  return userCommand(gameId, `select public.equip_skin($1, $2)`, [gameId, skin.success && skin.data ? skin.data : null], "Emblema atualizado.");
+}
+
+export async function activateCardAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const gameId = uuid.parse(form.get("gameId"));
+  return userCommand(gameId, `select public.activate_card($1)`, [uuid.parse(form.get("cardId"))], "Carta ativada para a próxima jornada.");
+}
+
+export async function setFunSettingsAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const gameId = uuid.parse(form.get("gameId"));
+  const on = (k: string) => form.get(k) === "on";
+  return userCommand(gameId, `select public.set_fun_settings($1, $2, $3, $4)`, [gameId, on("negatives"), on("pointPenalty"), on("betting")], "Definições guardadas.");
+}
+
+export async function placeBetAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const gameId = uuid.parse(form.get("gameId"));
+  const pick = z.enum(["1", "X", "2"]).safeParse(form.get("pick"));
+  if (!pick.success) return { error: "Escolhe 1, X ou 2." };
+  const eur = z.coerce.number().int("Valor em euros inteiros.").min(10_000, "Aposta mínima: €10 000.").max(1_000_000_000)
+    .safeParse(String(form.get("stakeEur") ?? "").replace(/[^\d]/g, ""));
+  if (!eur.success) return { error: eur.error.issues[0].message };
+  const key = z.string().min(8).max(100).safeParse(form.get("idempotencyKey"));
+  try {
+    const r = await placeBet(getPool(), user.id, gameId, uuid.parse(form.get("fixtureId")), pick.data, eur.data * 100, key.success ? key.data : randomUUID());
+    revalidatePath(`/g/${gameId}`, "layout");
+    return { ok: true, message: r.replayed ? "Aposta já registada." : `Aposta feita a ${Number(r.odds).toFixed(2)}. Boa sorte!` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function respondOfferAction(_: ActionState, form: FormData): Promise<ActionState> {
   const gameId = uuid.parse(form.get("gameId"));
   const accept = form.get("accept") === "true";
@@ -310,7 +406,7 @@ export async function listPlayerAction(_: ActionState, form: FormData): Promise<
   const gameId = uuid.parse(form.get("gameId"));
   const eur = z.coerce.number().int().min(100_000).max(1_000_000_000).safeParse(String(form.get("askingEur") ?? "").replace(/[^\d]/g, ""));
   if (!eur.success) return { error: "Preço inválido (mínimo €100 000)." };
-  return userCommand(gameId, `select public.list_player($1, $2)`, [uuid.parse(form.get("playerId")), eur.data * 100], "Jogador colocado à venda.");
+  return userCommand(gameId, `select public.list_player($1, $2)`, [uuid.parse(form.get("playerId")), eur.data * 100], "Jogador na Lista de Transferências.");
 }
 
 export async function unlistPlayerAction(_: ActionState, form: FormData): Promise<ActionState> {

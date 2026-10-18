@@ -98,13 +98,13 @@ export async function getRecentRatings(userId: string, clubId: string, n = 5) {
 }
 
 export const getClubColors = cache(async (userId: string, clubId: string) => {
-  return withUser(userId, async (c) => (await c.query<{ name_snapshot: string; short_name: string; primary_color: string; secondary_color: string }>(
-    `select name_snapshot, short_name, primary_color, secondary_color from game_clubs where id = $1`, [clubId])).rows[0] ?? null);
+  return withUser(userId, async (c) => (await c.query<{ name_snapshot: string; short_name: string; primary_color: string; secondary_color: string; crest_skin: string | null }>(
+    `select name_snapshot, short_name, primary_color, secondary_color, crest_skin from game_clubs where id = $1`, [clubId])).rows[0] ?? null);
 });
 
 export async function getStandings(userId: string, gameId: string, seasonNumber?: number) {
   return withUser(userId, async (c) => (await c.query(
-    `select s.club_id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.secondary_color, gc.manager_user_id, pr.display_name as manager_name,
+    `select s.club_id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.secondary_color, gc.crest_skin, gc.manager_user_id, pr.display_name as manager_name,
             s.played, s.won, s.drawn, s.lost, s.gf, s.ga, s.gd, s.points, s.form
        from standings s join seasons se on se.id = s.season_id join game_clubs gc on gc.id = s.club_id
        left join profiles pr on pr.id = gc.manager_user_id
@@ -277,7 +277,9 @@ export async function getOffers(userId: string, gameId: string) {
        from transfer_offers o join game_players p on p.id = o.player_id
        left join game_players sw on sw.id = o.swap_player_id
        join game_clubs b on b.id = o.buyer_club_id join game_clubs s on s.id = o.seller_club_id
-      where o.game_id = $1 order by (o.status = 'pending') desc, o.created_at desc limit 50`, [gameId, userId])).rows);
+      where o.game_id = $1 and coalesce(o.response_reason, '') not like 'listing%'
+        and (o.idempotency_key not like 'ai-list:%')
+      order by (o.status = 'pending') desc, o.created_at desc limit 50`, [gameId, userId])).rows);
 }
 
 export async function getMySquadLight(userId: string, clubId: string) {

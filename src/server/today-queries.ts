@@ -5,7 +5,7 @@ import { withUser } from "./db";
  * "Hoje" drawer: everything that is waiting for the manager's answer, newest deadline first. One round-trip, read
  * as the user (RLS), so it only ever lists the caller's own club's items.
  */
-export type TodayKind = "inbox" | "press" | "sponsor" | "contract" | "offer_in" | "counter" | "academy";
+export type TodayKind = "inbox" | "press" | "sponsor" | "contract" | "offer_in" | "counter" | "academy" | "duel";
 
 export interface TodayItem {
   kind: TodayKind;
@@ -52,12 +52,16 @@ export async function getTodayItems(userId: string, gameId: string, clubId: stri
      union all
      select 'academy', min(x.id::text), 'Formação: ' || count(*) || (case when count(*) = 1 then ' jovem à espera' else ' jovens à espera' end), 'Promover ou dispensar', null
        from academy_prospects x, g where x.club_id = $2 and x.status = 'academy' and x.season = g.s
-     having count(*) > 0`,
+     having count(*) > 0
+     union all
+     select 'duel', d.id::text, 'Duelo na roleta: ' || c.name_snapshot, 'Aposta de €500 000 — aceitas?', null
+       from slot_duels d join game_clubs c on c.id = d.challenger_club_id
+      where d.opponent_club_id = $2 and d.status = 'open'`,
     [gameId, clubId])).rows);
 
   const href: Record<TodayKind, string> = {
     inbox: `${base}/week?tab=gabinete`, press: `${base}/week?tab=imprensa`, sponsor: `${base}/club?tab=patrocinios`,
-    contract: `${base}/club?tab=contratos`, offer_in: `${base}/market`, counter: `${base}/market`, academy: `${base}/club?tab=formacao`,
+    contract: `${base}/club?tab=contratos`, offer_in: `${base}/market`, counter: `${base}/market`, academy: `${base}/club?tab=formacao`, duel: `${base}/slots`,
   };
   return rows
     .map((r) => ({ kind: r.kind, id: r.id, title: r.title, detail: r.detail ?? "", href: href[r.kind], dueRound: r.due_round }))

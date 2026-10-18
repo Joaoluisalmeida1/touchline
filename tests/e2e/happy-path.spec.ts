@@ -164,12 +164,12 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   const playedCells = await r.locator("tbody tr").count();
   expect(playedCells).toBeGreaterThan(3);
 
-  // Rui buys a player from an AI club at the asking price
-  await r.goto(`${gameUrl}/market?listed=&league=game`);
-  await r.locator("a", { hasText: "Proposta" }).last().click();
-  await expect(r.getByLabel("Valor da proposta (€)")).toBeVisible();
-  await r.getByRole("button", { name: "Fazer proposta" }).click();
-  await expect(r.getByText(/Proposta aceite|Proposta enviada|Recusada/).first()).toBeVisible();
+  // Rui buys the cheapest player on the Transfer List (AI clubs only sell there now)
+  await r.goto(`${gameUrl}/market?sort=price`);
+  await expect(r.getByRole("heading", { name: "Lista de transferências" })).toBeVisible();
+  await r.getByRole("button", { name: "Comprar" }).first().click();
+  await expect(r.getByText(/já é jogador do teu clube/)).toBeVisible();
+  await r.screenshot({ path: "test-results/market-desktop.png", fullPage: true });
   await r.goto(`${gameUrl}/finances`);
   await expect(r.getByRole("columnheader", { name: "Saldo" })).toBeVisible();
   await expect(r.getByText("Contas da época (blocos de 4 jornadas)")).toBeVisible();

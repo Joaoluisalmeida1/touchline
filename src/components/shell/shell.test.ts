@@ -43,7 +43,7 @@ describe("hubs", () => {
   it("every page route belongs to exactly one hub", () => {
     const keys = all.flatMap((h) => h.tabs.map((t) => t.key));
     expect(new Set(keys).size).toBe(keys.length);
-    for (const r of ["", "/week", "/squad", "/tactics", "/fixtures", "/market", "/club", "/finances", "/table", "/news", "/cup", "/social", "/history", "/settings"]) {
+    for (const r of ["", "/week", "/squad", "/tactics", "/fixtures", "/market", "/club", "/finances", "/table", "/news", "/cup", "/social", "/history", "/settings", "/slots", "/bets"]) {
       expect(keys).toContain(r);
     }
   });

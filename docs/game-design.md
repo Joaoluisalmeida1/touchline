@@ -13,6 +13,8 @@ Princípios: assíncrono (5–10 min/dia no telemóvel), poucas decisões com ef
 | 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | **Implementado** |
 | 4a · Rivais e balneário | `feat/phase-4a-rivals-social` | Negociações entre humanos (contrapropostas, trocas + dinheiro, notas), mural da liga (Balneário) com reações e publicações automáticas, conquistas e perfis de treinador | **Implementado** |
 | 4b · Taças e carreira | `feat/phase-4b-cups-careers` | Taça a eliminar, academia (jovens gerados), renovações de contrato e saídas a custo zero (jogadores livres) | **Implementado** |
+| M · Mercado OSM | `feat/market-osm` | Lista de Transferências que vai enchendo, preços a descer por jornada, vagas de venda, IA compra nas jornadas, estrangeiros na lista | **Implementado** |
+| S · Roleta e apostas | `feat/slots-betting` | Roleta (€500k/giro) com prémios e castigos, jackpot da liga, cartas guardáveis, duelos; odds e apostas nos jogos | **Implementado** |
 | 5 · Divisões e empréstimos | `feat/phase-5-divisions` | Ligas com duas divisões e subidas/descidas, empréstimos (com divisão de salário e opção de compra), cláusulas de revenda, pré-época guiada | Planeado |
 
 Cada fase termina com um *gate*: 4 jornadas jogadas com amigos; fica o que for usado.
@@ -63,6 +65,31 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 - **Academia** (career-v1, separador Formação do Clube): depois de ~2/3 da época, cada clube recebe 3–6 jovens fictícios (16–18 anos, OVR 40–66, potencial por banda), mais e melhores com coordenador da formação de nível alto. Promover = contrato de 3 épocas na equipa principal; dispensar = sai. A IA promove o melhor se tiver espaço e dispensa os restantes no fim da época. Conquista "Prata da casa".
 - **Contratos** (separador Contratos): jogadores no último ano pedem um salário para renovar (1–3 épocas; mais caro se a moral estiver baixa ou forem ambiciosos, mais barato se leais; ≥ 33 anos só 1 época). Jogadores muito descontentes recusam renovar. Na mudança de época, quem não renovou num clube humano **sai a custo zero** (nunca abaixo do plantel mínimo); os clubes da IA continuam a renovar automaticamente.
 - **Jogadores livres** (Mercado): podem ser contratados por qualquer treinador sem custo de transferência, ao salário pedido, até à 3.ª jornada; depois a IA fica com os restantes, cada um no clube que mais precisa daquela posição.
+
+## Mercado (market-v2, estilo OSM) — o que existe
+
+- **Lista de Transferências** (`/g/[id]/market`): um só mercado para a liga. A cada jornada entram jogadores novos — de clubes da IA desta liga (nunca os 3 melhores de cada clube nem abaixo do plantel mínimo + 2) e de clubes estrangeiros do dataset (OVR dentro da gama da liga). 4–8 por jornada (3 + nº de treinadores), o dobro no início de cada época, até 24 abertos. Os caros são mais raros (peso ∝ valor^−0,6), com ~12% de hipótese de sair uma "pérola" do terço mais valioso.
+- **Preço**: entra a 1,15–1,35× o valor e desce 8% por jornada sem comprador até 70% do valor; depois de uma jornada no mínimo sai da lista. A UI mostra o preço da próxima jornada e "Última jornada".
+- **Comprar**: um clique, ao preço mostrado (se o preço mudou entretanto, a compra falha e mostra o novo); quem clicar primeiro leva. Estrangeiros ganham salário pela reputação do clube e contrato de 2+ épocas.
+- **Vender**: o treinador põe jogadores na lista a preço fixo entre 50% e 150% do valor, com 4 vagas (`settings_json.market_slots`). Os amigos compram logo; a IA compra nas jornadas — probabilidade `clamp(1,6 − preço/valor)` × fase da época (1,3 no início → 0,7 no fim) × tamanho (jogadores caros vendem pior), no máximo uma compra por clube da IA por jornada, preferindo o clube com menos jogadores dessa posição.
+- **Clubes da IA não respondem a propostas**: só vendem pela lista. Entre treinadores humanos mantêm-se as negociações (propostas, contrapropostas, trocas, notas). Ligas antigas podem voltar ao mercado clássico com `settings_json.market = 'classic'`.
+- Tudo corre no servidor numa "ronda de mercado" por (época, jornada), idempotente (marcador `market_tick`), depois de cada jornada e na primeira visita ao mercado.
+
+## Roleta, duelos e apostas — o que existe
+
+- **Roleta da Liga** (`/g/[id]/slots`, slots-v1, Hoje › Roleta): cada giro custa **€500 000**, até **5 giros por dia** por treinador (dia na timezone da liga). Máquina com luzes, três rolos, som (Web Audio, com botão de silêncio), vibração e confetes; o resultado é sempre decidido no servidor (aleatoriedade criptográfica, não previsível pelo código aberto). Probabilidades públicas na página:
+  - **Comum (~43%)**: €100–400k, +6 moral a 3 jogadores, +8% condição ao plantel.
+  - **Raro (~22%)**: €1–2,5M, giro grátis, carta Escudo, emblema raro.
+  - **Épico (~11%)**: carta Imunidade a lesões, carta Bilheteira ×2, emblema épico, **jogador** (de clubes fora da liga e fora da Lista; peso ∝ valor^−0,8 — os caros são raros mas qualquer um pode sair; plantel cheio → metade do valor em dinheiro).
+  - **Lendário (~1,6%)**: €5–10M, emblema animado, **JACKPOT** (pote da liga: €2M + 20% de cada giro + todas as multas).
+  - **Azar (~22%)**: lesão no treino (1–3 jornadas), multa €300k–€1M (vai para o jackpot), jogador amuado (−12 moral). **Desastre (0,5%)**: −1 ponto na classificação.
+  - O dono da liga pode desligar os azares e decide o −1 ponto (desligado por omissão → sai uma multa). O Escudo anula o próximo azar.
+- **Cartas guardáveis**: Escudo (automático), Imunidade (ativa-se para a próxima jornada: as lesões dessa jornada não contam), Bilheteira ×2 (a receita de bilheteira dessa jornada em casa vem a dobrar), Giro grátis (não conta para o limite).
+- **Emblemas**: riscas, aros, estrela, faixa, xadrez (raros), ouro, carbono, vitral (épicos), chama e relâmpago (animados, lendários). Coleção na Roleta; o emblema escolhido aparece no cabeçalho, na tabela e nas apostas. Repetido → €250k.
+- **Duelos**: desafias outro treinador; €500 000 ficam reservados; ao aceitar, os dois giram (pontos por símbolo, pares +5, trio ×2) e quem fizer mais leva €500 000 do outro; empate = ninguém paga. No "Por decidir" e no mural.
+- **Mural**: épicos, lendários, desastres, jackpots, duelos e apostas grandes são publicados automaticamente.
+- **Apostas** (`/g/[id]/bets`, betting-v1, Jogo › Apostas): odds 1X2 para todos os jogos da próxima jornada, pela força das equipas e o fator casa (margem 7%). Cada treinador aposta o que quiser (mínimo €10 000, até ao dinheiro disponível) em qualquer jogo **menos o seu**. A aposta sai logo da conta; o prémio (aposta × odd) entra depois da jornada. Tabela dos apostadores por lucro. O dono pode desligar as apostas.
+- Tudo com dinheiro do jogo — não há forma de comprar giros ou fichas com dinheiro real.
 
 ## Próximas fases — regras de desenho já acordadas
 
