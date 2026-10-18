@@ -1,0 +1,53 @@
+name: Scheduled ops
+
+# Every 15 min: uptime check, then process due matchdays. Complements the Vercel cron, which Hobby limits to 1×/day.
+# A failed run means the site/DB is down or a league failed to process: GitHub emails the workflow's last editor.
+# Needs repo variable APP_BASE_URL and secret CRON_SECRET (docs/runbook.md); skips with a notice until both exist.
+# Side effect: keeps the Supabase Free project from pausing after a week without activity.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-ops
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    name: Health + due matchdays
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$APP_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::notice::Scheduled ops not configured (set variable APP_BASE_URL and secret CRON_SECRET) — skipping."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Health check
+        if: steps.cfg.outputs.enabled == 'true'
+        run: curl --fail-with-body -sS --retry 2 --retry-delay 15 --retry-all-errors --max-time 30 "$APP_BASE_URL/api/health"
+
+      - name: Process due matchdays
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          # no retries: the endpoint is idempotent, but a failure should surface, not be papered over
+          code=$(curl -sS -o result.json -w '%{http_code}' --max-time 310 -H "Authorization: Bearer $CRON_SECRET" "$APP_BASE_URL/api/cron/process")
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("result.json", "utf8"));
+            console.log(`processed=${r.processed ?? 0} failed=${r.failed ?? 0} budget_exhausted=${r.budget_exhausted ?? false}`);
+            for (const x of r.results ?? []) if (x.error) console.log(`::error title=League failed::${x.game_id}: ${x.error}`);
+          ' || cat result.json
+          echo "HTTP $code"
+          [ "$code" = "200" ]

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { withService, withUser } from "./db";
 
 /** All reads run as the signed-in user (RLS enforced). Columns are explicit (game_players has hidden columns). */
@@ -33,7 +34,8 @@ export async function listMyGames(userId: string) {
       order by g.created_at desc`, [userId])).rows);
 }
 
-export async function getGame(userId: string, gameId: string) {
+/** Deduplicated per request (React cache): the league layout and every league page call this with the same args. */
+export const getGame = cache(async (userId: string, gameId: string) => {
   return withUser(userId, async (c) => {
     const g = await c.query(
       `select g.*, g.owner_user_id = $2 as is_owner, ds.is_synthetic, ds.label as snapshot_label, sl.name as league_name,
@@ -46,7 +48,7 @@ export async function getGame(userId: string, gameId: string) {
         where g.id = $1`, [gameId, userId]);
     return g.rows[0] ?? null;
   });
-}
+});
 
 export async function getClubs(userId: string, gameId: string) {
   return withUser(userId, async (c) => (await c.query(
@@ -95,10 +97,10 @@ export async function getRecentRatings(userId: string, clubId: string, n = 5) {
   });
 }
 
-export async function getClubColors(userId: string, clubId: string) {
+export const getClubColors = cache(async (userId: string, clubId: string) => {
   return withUser(userId, async (c) => (await c.query<{ name_snapshot: string; short_name: string; primary_color: string; secondary_color: string }>(
     `select name_snapshot, short_name, primary_color, secondary_color from game_clubs where id = $1`, [clubId])).rows[0] ?? null);
-}
+});
 
 export async function getStandings(userId: string, gameId: string, seasonNumber?: number) {
   return withUser(userId, async (c) => (await c.query(
@@ -341,6 +343,6 @@ export async function listSnapshotsForCreation(userId: string) {
       where ds.status = 'finalized' order by ds.created_at desc, l.name`)).rows);
 }
 
-export async function getProfile(userId: string) {
+export const getProfile = cache(async (userId: string) => {
   return withUser(userId, async (c) => (await c.query(`select id, display_name, is_admin from profiles where id = $1`, [userId])).rows[0] ?? null);
-}
+});

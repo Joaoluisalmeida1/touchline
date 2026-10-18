@@ -1,0 +1,70 @@
+name: Nightly backup
+
+# Encrypted, restore-tested backup of the production database (the Supabase Free plan has no backups).
+# The dump is restored into a scratch Postgres built from supabase/migrations and row counts are compared before
+# anything is kept; only the age-encrypted bundle is uploaded (the repo is public). Setup + restore: docs/runbook.md.
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, restore drill, encrypt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      BACKUP_DB_URL: ${{ secrets.BACKUP_DB_URL }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      DRILL_PG_URL: postgres://postgres:postgres@localhost:5432
+      PG_CLIENT_MAJOR: "17" # must be >= the production server's major version
+    steps:
+      - name: Check configuration
+        id: cfg
+        run: |
+          if [ -z "$BACKUP_DB_URL" ] || [ -z "$BACKUP_AGE_RECIPIENT" ]; then
+            echo "::notice::Backups not configured (secret BACKUP_DB_URL, variable BACKUP_AGE_RECIPIENT) — skipping."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.cfg.outputs.enabled == 'true'
+
+      - name: Install PostgreSQL client and age
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common age >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq "postgresql-client-$PG_CLIENT_MAJOR" >/dev/null
+          echo "/usr/lib/postgresql/$PG_CLIENT_MAJOR/bin" >> "$GITHUB_PATH"
+
+      - name: Backup + restore drill
+        if: steps.cfg.outputs.enabled == 'true'
+        run: scripts/backup/backup.sh
+
+      - name: Upload encrypted bundle
+        if: steps.cfg.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: touchline-backup-${{ github.run_id }}
+          path: backup-out/*.age
+          if-no-files-found: error
+          retention-days: 30

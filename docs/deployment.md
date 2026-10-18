@@ -42,7 +42,8 @@
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` |
 | `SUPABASE_DB_URL` | pooler de transações (6543) — **secreto** |
 | `APP_BASE_URL` | `https://<app>.vercel.app` |
-| `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron |
+| `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron; o mesmo valor vai para o secret `CRON_SECRET` do GitHub (Scheduled ops) |
+| `ALERT_WEBHOOK_URL` | opcional — webhook Discord/Slack para alertas de erro do servidor (`docs/runbook.md`) |
 | `NEXT_PUBLIC_APP_NAME` | opcional |
 | `AUTH_MODE` | **não definir** (default `supabase`). `dev` é recusado na Vercel. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | opcional — notificações push. Gerar com `npx web-push generate-vapid-keys` |
@@ -50,7 +51,8 @@
 | `VAPID_SUBJECT` | opcional, ex.: `mailto:teu-email@exemplo.pt` |
 
    `PLAYERELO_API_KEY` **não** é necessária na Vercel (importação é feita por CLI).
-3. Settings → Functions → Region: a mesma região do Supabase (latência por query).
+3. Settings → Functions → Region: a mesma região do Supabase (latência por query — cada página faz 10–40 instruções SQL). Manter **Fluid compute** ligado (default); o pool já está registado com `attachDatabasePool`.
+   No Supabase: Project Settings → **JWT Keys** → usar chaves assimétricas (ECC/RSA). Assim `getClaims()` verifica a sessão localmente, sem ida ao Supabase Auth em cada pedido; com a chave HS256 legada funciona na mesma, mas faz a chamada de rede.
 4. Deploy. O `vercel.json` regista o cron diário `0 19 * * *` em `/api/cron/process` (Hobby: 1×/dia, ±59 min).
 5. Verificar:
    ```bash

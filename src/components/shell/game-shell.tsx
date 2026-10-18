@@ -72,14 +72,14 @@ export function GameShell({ game, club, today, players, children }: {
 function Rail({ hubs: all, active, base }: { hubs: Hub[]; active: string; base: string }) {
   return (
     <nav aria-label="Navegação da liga" className="sticky top-0 hidden h-dvh w-[88px] shrink-0 flex-col items-center gap-1 border-r border-line bg-bg py-4 md:flex">
-      <Link href="/dashboard" aria-label="As minhas ligas" title="As minhas ligas" className="mb-4 flex flex-col items-center gap-1 text-ink">
+      <Link href="/dashboard" prefetch={false} aria-label="As minhas ligas" title="As minhas ligas" className="mb-4 flex flex-col items-center gap-1 text-ink">
         <LogoMark size={32} />
         <span className="font-display text-[10px] font-black uppercase tracking-[0.12em] [font-stretch:66%]">Touchline</span>
       </Link>
       {all.map((h) => {
         const on = h.id === active;
         return (
-          <Link key={h.id} href={base + h.tabs[0].key} aria-current={on ? "page" : undefined}
+          <Link key={h.id} href={base + h.tabs[0].key} prefetch={false} aria-current={on ? "page" : undefined}
             className={cn("relative flex min-h-[58px] w-[72px] flex-col items-center justify-center gap-1 rounded-[10px] text-xs transition-colors",
               on ? "font-bold text-accent-ink" : "font-semibold text-muted hover:bg-surface-2 hover:text-ink")}>
             {on && <motion.span layoutId="rail-on" className="absolute inset-0 rounded-[10px] bg-accent" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
@@ -89,7 +89,7 @@ function Rail({ hubs: all, active, base }: { hubs: Hub[]; active: string; base: 
         );
       })}
       <div className="mt-auto flex flex-col items-center gap-1">
-        <Link href="/dashboard" className="flex min-h-[52px] w-[72px] flex-col items-center justify-center gap-1 rounded-[10px] text-[11px] font-semibold text-muted hover:bg-surface-2 hover:text-ink">
+        <Link href="/dashboard" prefetch={false} className="flex min-h-[52px] w-[72px] flex-col items-center justify-center gap-1 rounded-[10px] text-[11px] font-semibold text-muted hover:bg-surface-2 hover:text-ink">
           <LayoutGrid className="size-5" />Ligas
         </Link>
         <form action={logoutAction}>
@@ -112,11 +112,11 @@ function ContextBar({ game, club, hub, tabHref, base, todayCount, onToday, onPal
     <header className="sticky top-0 z-30 border-b border-line bg-bg/92 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
       <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 pt-3 sm:px-6 lg:px-8">
         {club ? (
-          <Link href={`${base}/club`} aria-label={`${club.name} — clube`} className="shrink-0">
+          <Link href={`${base}/club`} prefetch={false} aria-label={`${club.name} — clube`} className="shrink-0">
             <ClubBadge seed={club.id} name={club.name} short={club.short} primary={club.primary} secondary={club.secondary} size={40} />
           </Link>
         ) : (
-          <Link href="/dashboard" aria-label="As minhas ligas" className="shrink-0 text-ink md:hidden"><LogoMark size={30} /></Link>
+          <Link href="/dashboard" prefetch={false} aria-label="As minhas ligas" className="shrink-0 text-ink md:hidden"><LogoMark size={30} /></Link>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
@@ -193,7 +193,7 @@ function MobileDock({ hubs: all, active, base }: { hubs: Hub[]; active: string; 
         {dock.map((h) => {
           const on = h.id === active;
           return (
-            <Link key={h.id} href={base + h.tabs[0].key} aria-current={on ? "page" : undefined} className="relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[10px] py-1">
+            <Link key={h.id} href={base + h.tabs[0].key} prefetch={false} aria-current={on ? "page" : undefined} className="relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[10px] py-1">
               {on && <motion.span layoutId="dock-on" className="absolute inset-x-1 inset-y-0 rounded-[10px] bg-accent" transition={{ type: "spring", stiffness: 500, damping: 36 }} />}
               <span className={cn("relative [&_svg]:size-5", on ? "text-accent-ink" : "text-muted")}><h.icon /></span>
               <span className={cn("relative text-[11px] font-semibold", on ? "text-accent-ink" : "text-muted")}>{h.label}</span>
@@ -247,7 +247,7 @@ function TodayDrawer({ open, onClose, items, round }: { open: boolean; onClose: 
               {items.map((i) => {
                 const urgent = i.dueRound !== null && i.dueRound <= round + 1;
                 return (
-                  <Link key={`${i.kind}:${i.id}`} href={i.href} className="group flex gap-3 rounded-xl bg-surface-2 p-3.5 transition hover:bg-surface-3">
+                  <Link key={`${i.kind}:${i.id}`} href={i.href} prefetch={false} className="group flex gap-3 rounded-xl bg-surface-2 p-3.5 transition hover:bg-surface-3">
                     <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface text-ink [&_svg]:size-[18px]">{KIND_ICON[i.kind]}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-muted">

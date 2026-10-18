@@ -267,11 +267,13 @@ export async function endSeason(pool: Pool, gameId: string) {
 }
 
 /** Cron entry: process games in daily mode whose deadline passed. Bounded batch per invocation. */
-export async function processDueGames(pool: Pool, opts: { limit?: number; requestId?: string } = {}) {
+export async function processDueGames(pool: Pool, opts: { limit?: number; requestId?: string; excludeIds?: string[] } = {}) {
+  // excludeIds: games already handled by this cron invocation (processed, skipped or failed) — one round per game per run
   const due = await asService(pool, async (c) => (await c.query(
     `select id from public.games where status = 'active' and tick_mode = 'daily' and next_deadline_at <= now()
        and (processing_lease_until is null or processing_lease_until < now())
-     order by next_deadline_at limit $1`, [opts.limit ?? 10])).rows as { id: string }[]);
+       and not (id = any($2::uuid[]))
+     order by next_deadline_at limit $1`, [opts.limit ?? 10, opts.excludeIds ?? []])).rows as { id: string }[]);
   const out: { game_id: string; result?: MatchdayResult; error?: string }[] = [];
   for (const g of due) {
     try {

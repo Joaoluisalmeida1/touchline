@@ -11,6 +11,21 @@ export const THEME_COLORS: Record<Theme, string> = { dark: "#111315", light: "#f
 /** Runs in <head> before paint. Keep it tiny and dependency-free. */
 export const PREFS_BOOT_SCRIPT = `(function(){try{var d=document.documentElement,t=localStorage.getItem("${THEME_KEY}");d.dataset.theme=t==="light"?"light":"dark";if(localStorage.getItem("${MOTION_KEY}")==="reduce")d.dataset.motion="reduce";}catch(e){document.documentElement.dataset.theme="dark";}})();`;
 
+/**
+ * Re-applies the stored preferences to <html>. The boot script does this before first paint; this covers the case where
+ * React re-creates <html> on the client (e.g. recovering from a hydration mismatch), which drops the attributes.
+ */
+export function applyStoredPrefs() {
+  const d = document.documentElement;
+  let theme: Theme = "dark", reduce = false;
+  try {
+    theme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+    reduce = localStorage.getItem(MOTION_KEY) === "reduce";
+  } catch { /* storage blocked: defaults */ }
+  if (d.dataset.theme !== theme) d.dataset.theme = theme;
+  if (reduce) d.dataset.motion = "reduce";
+}
+
 function store(key: string, value: string | null) {
   try {
     if (value === null) localStorage.removeItem(key);

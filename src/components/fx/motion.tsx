@@ -4,7 +4,8 @@
  * Watermelon UI motion language (https://ui.watermelon.sh, MIT).
  */
 import { MotionConfig, motion, type HTMLMotionProps } from "motion/react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
+import { applyStoredPrefs } from "@/lib/prefs";
 import { usePrefs } from "../shell/use-prefs";
 
 export const spring = { type: "spring", stiffness: 380, damping: 32, mass: 0.8 } as const;
@@ -12,6 +13,7 @@ export const softSpring = { type: "spring", stiffness: 240, damping: 26, mass: 0
 
 /** Follows the system setting, or the in-app "Reduzir movimento" toggle when it is on. */
 export function MotionProvider({ children }: { children: ReactNode }) {
+  useLayoutEffect(applyStoredPrefs, []);
   const { reduce } = usePrefs();
   return <MotionConfig reducedMotion={reduce ? "always" : "user"} transition={spring}>{children}</MotionConfig>;
 }

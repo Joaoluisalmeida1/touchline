@@ -40,7 +40,11 @@ export function PillTabs<K extends string>({ tabs, value, onChange, label, size 
   );
 }
 
-/** Route tabs (links) with an animated underline + glow. */
+/**
+ * Route tabs (links) with an animated underline + glow.
+ * prefetch={false}: league pages are fully dynamic with no loading boundary, so a viewport prefetch fetched nothing
+ * reusable but still cost one server request (function invocation + auth middleware) per tab on every page view.
+ */
 export function NavTabs({ items, activeHref, label }: { items: { href: string; label: string; icon?: ReactNode }[]; activeHref: string; label: string }) {
   const id = useId();
   return (
@@ -49,7 +53,7 @@ export function NavTabs({ items, activeHref, label }: { items: { href: string; l
         {items.map((it) => {
           const active = it.href === activeHref;
           return (
-            <Link key={it.href} href={it.href} aria-current={active ? "page" : undefined}
+            <Link key={it.href} href={it.href} prefetch={false} aria-current={active ? "page" : undefined}
               className={cn("group relative flex items-center gap-2 whitespace-nowrap px-3 pb-3 pt-2 text-sm font-semibold transition-colors",
                 active ? "text-ink" : "text-muted hover:text-ink")}>
               <span className={cn("transition-colors", active ? "text-accent" : "text-faint group-hover:text-muted")}>{it.icon}</span>

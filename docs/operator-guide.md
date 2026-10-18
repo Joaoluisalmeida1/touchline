@@ -54,6 +54,8 @@ Corre em cada PR e em cada push para `main`, em três jobs paralelos:
 | `integration` | `npm run test:coverage` (unit + integração) contra um serviço `postgres:17`; aplica os limites de cobertura, publica a tabela de cobertura no resumo do job e o relatório como artefacto `coverage-report` |
 | `build-e2e` | `next build` → `npm run typecheck` → verifica que `DEV_AUTH_SECRET`/`CRON_SECRET`/`SUPABASE_DB_URL` não aparecem em `.next/static` → BD `touchline_e2e` + seed sintético → `next start` (`AUTH_MODE=dev`) → Playwright. Em falha, o relatório, traces e `server.log` ficam como artefacto `e2e-report`. |
 
+O workflow `.github/workflows/pr-rules.yml` (*Migration PRs have a rollback plan*) falha um PR que altere `supabase/migrations/` sem a secção **Rollback plan** preenchida (Code + Database); volta a correr ao editar a descrição. Regras completas em [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+
 O CI não usa segredos reais nem contas Supabase. O Dependabot (`.github/dependabot.yml`) abre PRs semanais de dependências npm (`next` e `eslint-config-next` agrupados) e mensais de GitHub Actions. Recomendado: proteger `main` no GitHub (Settings → Branches) exigindo os três jobs antes do merge.
 
 ## Importar ligas reais (PlayerElo)
@@ -94,6 +96,8 @@ Escreve em `source_players`, `dataset_snapshot_players` e nas ligas já criadas 
 - Rollback de um bug de progressão: `player_progression_log` tem `old_ovr/new_ovr` por jogador e fixture; corrigir com SQL dentro de uma transação e registar em `audit_log`.
 
 ## Backups e migração
+
+Backups automáticos (diários, cifrados, com teste de restauro) e o procedimento de restauro: [`docs/runbook.md`](runbook.md). Os comandos abaixo são para cópias manuais pontuais.
 
 ```bash
 pg_dump "$SUPABASE_DB_URL" -Fc -f backup-$(date +%F).dump          # backup completo

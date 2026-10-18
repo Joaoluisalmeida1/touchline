@@ -151,6 +151,8 @@ If the sandbox is fresh, clone isn't possible (no repo binding) — stage files 
 
 **Deploy flow:** apply DB migration first (remote, drop-free or via SQL Editor) → copy files to user's folder → user commits & pushes → Vercel builds → check deployments → ask user to test. Keep old SQL signatures working during rollout (old code may run against new DB).
 
+**PR rules (mandatory — `CONTRIBUTING.md`):** every PR declares a risk level; any PR with a migration (or High risk) must have a filled **Rollback plan** (code + database SQL or "forward-fix only" + why + data + point of no return) — the CI check *Migration PRs have a rollback plan* fails otherwise. Migrations are additive/backward compatible, numbered after the latest on `main` and open PRs, and applied after a backup. Performance PRs show before/after metrics, method and expected production impact. Never merge on red CI.
+
 ---
 
 ## 7. Supabase Auth settings (user did / should check)
