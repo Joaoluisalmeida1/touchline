@@ -36,6 +36,8 @@ describe("league lifecycle & security", () => {
     const r = await createGame(pool, A, { name: "Liga dos Amigos", snapshotId, leagueId, maxManagers: 4, tickMode: "manual", timezone: "Europe/Lisbon", deadlineHour: 20, roundIntervalHours: 24 });
     gameId = r.gameId;
     invite = r.inviteCode;
+    // this suite exercises the classic market (direct offers to AI clubs); market-v2 is covered by market-osm.test.ts
+    await pool.query(`update games set settings_json = settings_json || '{"market":"classic"}' where id = $1`, [gameId]);
     expect(invite).toMatch(/^[A-Z2-9]{16}$/);
     const clubs = await q<{ id: string; cash_cents: string }>(`select id, cash_cents from game_clubs where game_id = $1`, [gameId]);
     expect(clubs).toHaveLength(6);

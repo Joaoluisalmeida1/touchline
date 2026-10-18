@@ -46,6 +46,8 @@ beforeAll(async () => {
   manager = await createUser(pool, "mgr@test.dev", "Manuel");
   outsider = await createUser(pool, "out@test.dev", "Otávio");
   gameId = (await createGame(pool, manager, { name: "Liga Ext", snapshotId: snap.snapshotId, leagueId: homeLeague, maxManagers: 4, tickMode: "manual", timezone: "Europe/Lisbon", deadlineHour: 20, roundIntervalHours: 24 })).gameId;
+  // direct signings from other leagues are the classic market (market-v2 sells them through the Transfer List)
+  await pool.query(`update games set settings_json = settings_json || '{"market":"classic"}' where id = $1`, [gameId]);
   const club = (await pool.query(`select id from game_clubs where game_id = $1 order by name_snapshot limit 1`, [gameId])).rows[0].id;
   as(manager);
   expect((await A.selectClubAction({}, form({ gameId, clubId: club }))).ok).toBe(true);

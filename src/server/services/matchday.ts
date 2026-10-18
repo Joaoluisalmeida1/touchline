@@ -20,6 +20,7 @@ import { afterRound, ensureBusiness, resolveSponsorDefaults, seasonClauses } fro
 import { afterRoundSocial } from "./social";
 import { ensureCup, playDueCupRounds } from "./cup";
 import { academyAfterRound, aiSignFreeAgents, ensureContractTalks, seasonEndCareer } from "./career";
+import { marketTick } from "./market";
 import { absRound, stadiumFrom, type StaffRole, type Upgrade } from "../../engine/economy/business";
 
 export interface MatchdayResult {
@@ -141,6 +142,8 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     await resolveSponsorDefaults(pool, gameId, season, round);
     await ensureCup(pool, gameId);
     await ensureContractTalks(pool, gameId);
+    // first batch of the Transfer List if nobody opened the market before this round (no-op otherwise)
+    await marketTick(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "market.tick_failed", ...ctx, round, error: (e as Error).message })));
     const state = await loadLeagueState(pool, gameId, { season, round });
     const outcome = processRound({
       gameId, season, round, clubs: state.clubs, players: state.players, fixtures: pending,
@@ -218,6 +221,12 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "social.after_round_failed", ...ctx, round, error: (e as Error).message }));
     }
+    // Transfer List: prices drop, AI clubs buy managers' listings, new players appear
+    try {
+      await marketTick(pool, gameId);
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "market.tick_failed", ...ctx, round, error: (e as Error).message }));
+    }
     if (!complete.season_complete) {
       try {
         await prepareWeek(pool, gameId, season, round + 1);
@@ -263,6 +272,7 @@ export async function endSeason(pool: Pool, gameId: string) {
   await ensureBusiness(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "business.season_setup_failed", game_id: gameId, error: (e as Error).message })));
   await ensureCup(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "cup.season_setup_failed", game_id: gameId, error: (e as Error).message })));
   await ensureContractTalks(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "career.talks_failed", game_id: gameId, error: (e as Error).message })));
+  await marketTick(pool, gameId).catch((e) => console.error(JSON.stringify({ level: "error", msg: "market.tick_failed", game_id: gameId, error: (e as Error).message })));
   return r;
 }
 

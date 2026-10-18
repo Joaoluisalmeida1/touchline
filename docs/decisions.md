@@ -100,3 +100,11 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 - **Tema escuro por omissão**, com tema claro. Preferências por dispositivo (localStorage + script antes do primeiro paint), não na base de dados: evita escrever no servidor por um detalhe visual e mantém as páginas estáticas estáticas.
 - **Rotas inalteradas**: os 12 separadores passam a 5 hubs + Clube por cima das mesmas URLs, para não partir links, notificações push nem testes.
 - **"Por decidir" lê, não responde** nesta fase: a gaveta lista e liga a cada decisão; responder dentro da gaveta fica para `feat/ui-2-daily`.
+
+### Mercado estilo OSM (2026-10-18)
+
+- **A IA só vende pela Lista** (pedido do Joao: "igual ao OSM"). Propostas diretas a clubes da IA e o mercado externo direto ficam só para ligas `market = 'classic'`.
+- **Os jogadores aparecem aos poucos e o preço desce por jornada** (não por hora como no OSM): o ritmo da liga entre amigos é a jornada.
+- **Revenda livre**, como no OSM; o que trava o "flip" é a IA comprar pior quanto mais caro e mais tarde na época.
+- **Salários mantêm-se** (a economia da fase 3 depende deles); estrangeiros entram com o salário pela reputação do clube comprador.
+- **Compra por serviço** (`buy_listing_tx`, só service role): os estrangeiros precisam de salário/contrato/perfil calculados em TS; o SQL volta a validar tudo (membro, preço mostrado, fundos, plantel, unicidade).

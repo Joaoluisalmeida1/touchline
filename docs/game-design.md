@@ -13,6 +13,8 @@ Princípios: assíncrono (5–10 min/dia no telemóvel), poucas decisões com ef
 | 3 · Negócio do clube | `feat/phase-3-club-business` | Patrocinadores com cláusulas, direção e confiança, orçamentos, estádio e bilhetes, staff (adjunto, preparador físico, médico, olheiro, formação), economy-v2 | **Implementado** |
 | 4a · Rivais e balneário | `feat/phase-4a-rivals-social` | Negociações entre humanos (contrapropostas, trocas + dinheiro, notas), mural da liga (Balneário) com reações e publicações automáticas, conquistas e perfis de treinador | **Implementado** |
 | 4b · Taças e carreira | `feat/phase-4b-cups-careers` | Taça a eliminar, academia (jovens gerados), renovações de contrato e saídas a custo zero (jogadores livres) | **Implementado** |
+| M · Mercado OSM | `feat/market-osm` | Lista de Transferências que vai enchendo, preços a descer por jornada, vagas de venda, IA compra nas jornadas, estrangeiros na lista | **Implementado** |
+| S · Roleta e apostas | `feat/slots-betting` | Roleta (€500k/giro) com prémios e castigos, jackpot da liga, cartas guardáveis, duelos; odds e apostas nos jogos | **Implementado** |
 | 5 · Divisões e empréstimos | `feat/phase-5-divisions` | Ligas com duas divisões e subidas/descidas, empréstimos (com divisão de salário e opção de compra), cláusulas de revenda, pré-época guiada | Planeado |
 
 Cada fase termina com um *gate*: 4 jornadas jogadas com amigos; fica o que for usado.
@@ -63,6 +65,15 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 - **Academia** (career-v1, separador Formação do Clube): depois de ~2/3 da época, cada clube recebe 3–6 jovens fictícios (16–18 anos, OVR 40–66, potencial por banda), mais e melhores com coordenador da formação de nível alto. Promover = contrato de 3 épocas na equipa principal; dispensar = sai. A IA promove o melhor se tiver espaço e dispensa os restantes no fim da época. Conquista "Prata da casa".
 - **Contratos** (separador Contratos): jogadores no último ano pedem um salário para renovar (1–3 épocas; mais caro se a moral estiver baixa ou forem ambiciosos, mais barato se leais; ≥ 33 anos só 1 época). Jogadores muito descontentes recusam renovar. Na mudança de época, quem não renovou num clube humano **sai a custo zero** (nunca abaixo do plantel mínimo); os clubes da IA continuam a renovar automaticamente.
 - **Jogadores livres** (Mercado): podem ser contratados por qualquer treinador sem custo de transferência, ao salário pedido, até à 3.ª jornada; depois a IA fica com os restantes, cada um no clube que mais precisa daquela posição.
+
+## Mercado (market-v2, estilo OSM) — o que existe
+
+- **Lista de Transferências** (`/g/[id]/market`): um só mercado para a liga. A cada jornada entram jogadores novos — de clubes da IA desta liga (nunca os 3 melhores de cada clube nem abaixo do plantel mínimo + 2) e de clubes estrangeiros do dataset (OVR dentro da gama da liga). 4–8 por jornada (3 + nº de treinadores), o dobro no início de cada época, até 24 abertos. Os caros são mais raros (peso ∝ valor^−0,6), com ~12% de hipótese de sair uma "pérola" do terço mais valioso.
+- **Preço**: entra a 1,15–1,35× o valor e desce 8% por jornada sem comprador até 70% do valor; depois de uma jornada no mínimo sai da lista. A UI mostra o preço da próxima jornada e "Última jornada".
+- **Comprar**: um clique, ao preço mostrado (se o preço mudou entretanto, a compra falha e mostra o novo); quem clicar primeiro leva. Estrangeiros ganham salário pela reputação do clube e contrato de 2+ épocas.
+- **Vender**: o treinador põe jogadores na lista a preço fixo entre 50% e 150% do valor, com 4 vagas (`settings_json.market_slots`). Os amigos compram logo; a IA compra nas jornadas — probabilidade `clamp(1,6 − preço/valor)` × fase da época (1,3 no início → 0,7 no fim) × tamanho (jogadores caros vendem pior), no máximo uma compra por clube da IA por jornada, preferindo o clube com menos jogadores dessa posição.
+- **Clubes da IA não respondem a propostas**: só vendem pela lista. Entre treinadores humanos mantêm-se as negociações (propostas, contrapropostas, trocas, notas). Ligas antigas podem voltar ao mercado clássico com `settings_json.market = 'classic'`.
+- Tudo corre no servidor numa "ronda de mercado" por (época, jornada), idempotente (marcador `market_tick`), depois de cada jornada e na primeira visita ao mercado.
 
 ## Próximas fases — regras de desenho já acordadas
 

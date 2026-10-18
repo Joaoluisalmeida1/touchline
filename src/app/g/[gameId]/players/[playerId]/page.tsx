@@ -12,6 +12,9 @@ import { PlayerAvatar } from "@/components/squad/avatar";
 import { listPlayerAction, unlistPlayerAction } from "@/server/actions";
 import { requireUser } from "@/server/auth";
 import { getGame, getMySquadLight, getPlayer } from "@/server/queries";
+import { getPlayerListing } from "@/server/market-queries";
+import { BuyButton } from "@/components/market/market-ui";
+import { listBounds } from "@/engine/market/market";
 
 const GROUP_NAME: Record<string, string> = { GK: "Guarda-redes", DEF: "Defesa", MID: "Médio", ATT: "Avançado" };
 
@@ -25,6 +28,9 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
   const { player: p, log, matches, askingPrice, transfers } = data;
   const mine = p.club_id === game.my_club_id;
   const mySquad = !mine && game.my_club_id && p.manager_user_id ? await getMySquadLight(user.id, game.my_club_id) : [];
+  const listing = p.club_id ? await getPlayerListing(user.id, p.id) : null;
+  const osm = (game.settings_json?.market ?? "osm") === "osm";
+  const bounds = listBounds(Number(p.market_value_cents));
   const st = p.season_stats_json ?? {};
   const points = [{ label: "Início", ovr: p.initial_ovr }, ...log.map((l) => ({ label: `E${l.season_number} J${l.round_number}`, ovr: l.new_ovr }))];
   const color = p.club_color ?? "#3b4450", color2 = p.club_color2 ?? "#ffffff";
@@ -133,10 +139,21 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
               p.listed_price ? (
                 <ActionForm action={unlistPlayerAction} hidden={{ gameId, playerId: p.id }} submitLabel="Retirar do mercado" variant="secondary" submitClassName="w-full" />
               ) : (
-                <ActionForm action={listPlayerAction} hidden={{ gameId, playerId: p.id }} submitLabel="Colocar à venda" variant="secondary" submitClassName="w-full">
-                  <Field label="Preço pedido (€)"><input name="askingEur" inputMode="numeric" defaultValue={Math.round(Number(p.market_value_cents) / 100 * 1.2)} className={inputCls} /></Field>
+                <ActionForm action={listPlayerAction} hidden={{ gameId, playerId: p.id }} submitLabel="Pôr na Lista de Transferências" variant="secondary" submitClassName="w-full">
+                  <Field label="Preço pedido (€)" hint={osm ? `Entre ${eur(bounds.min)} e ${eur(bounds.max)} (50–150% do valor). Máx. 4 jogadores à venda.` : undefined}>
+                    <input name="askingEur" inputMode="numeric" defaultValue={Math.round(Number(p.market_value_cents) / 100 * 1.2)} className={inputCls} />
+                  </Field>
                 </ActionForm>
               )
+            ) : game.my_club_id && listing ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted">Está na Lista de Transferências por <b className="font-display text-lg text-ink">{eur(listing.price_cents)}</b>.</p>
+                <BuyButton gameId={gameId} listingId={listing.id} priceCents={listing.price_cents} name={p.name_snapshot} />
+                {p.manager_user_id && <OfferForm gameId={gameId} playerId={p.id} suggestedEur={Math.round(Number(listing.price_cents) / 100)} aiClub={false}
+                  mySquad={mySquad} parentOfferId={parent && /^[0-9a-f-]{36}$/.test(parent) ? parent : undefined} />}
+              </div>
+            ) : game.my_club_id && p.club_id && osm && !p.manager_user_id ? (
+              <p className="text-sm text-muted">Os clubes da IA só vendem pela <a href={`/g/${gameId}/market`} className="font-semibold text-accent">Lista de Transferências</a>. Fica atento: aparecem jogadores novos todas as jornadas.</p>
             ) : game.my_club_id && p.club_id ? (
               <OfferForm gameId={gameId} playerId={p.id} suggestedEur={Math.round(Number(askingPrice ?? p.market_value_cents) / 100)} aiClub={!p.manager_user_id}
                 mySquad={mySquad} parentOfferId={parent && /^[0-9a-f-]{36}$/.test(parent) ? parent : undefined} />

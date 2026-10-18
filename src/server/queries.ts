@@ -277,7 +277,9 @@ export async function getOffers(userId: string, gameId: string) {
        from transfer_offers o join game_players p on p.id = o.player_id
        left join game_players sw on sw.id = o.swap_player_id
        join game_clubs b on b.id = o.buyer_club_id join game_clubs s on s.id = o.seller_club_id
-      where o.game_id = $1 order by (o.status = 'pending') desc, o.created_at desc limit 50`, [gameId, userId])).rows);
+      where o.game_id = $1 and coalesce(o.response_reason, '') not like 'listing%'
+        and (o.idempotency_key not like 'ai-list:%')
+      order by (o.status = 'pending') desc, o.created_at desc limit 50`, [gameId, userId])).rows);
 }
 
 export async function getMySquadLight(userId: string, clubId: string) {
