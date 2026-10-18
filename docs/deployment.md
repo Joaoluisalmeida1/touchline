@@ -42,7 +42,7 @@
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` |
 | `SUPABASE_DB_URL` | pooler de transações (6543) — **secreto** |
 | `APP_BASE_URL` | `https://<app>.vercel.app` |
-| `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron; o mesmo valor vai para o secret `CRON_SECRET` do GitHub (Scheduled ops) |
+| `CRON_SECRET` | `openssl rand -hex 32` — a Vercel envia-o no header do cron |
 | `ALERT_WEBHOOK_URL` | opcional — webhook Discord/Slack para alertas de erro do servidor (`docs/runbook.md`) |
 | `NEXT_PUBLIC_APP_NAME` | opcional |
 | `AUTH_MODE` | **não definir** (default `supabase`). `dev` é recusado na Vercel. |

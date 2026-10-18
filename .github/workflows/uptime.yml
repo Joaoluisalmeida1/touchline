@@ -1,0 +1,33 @@
+name: Uptime check
+
+# Every 15 min: /api/health (app + database). A failed run emails the workflow's last editor.
+# Matchdays are NOT processed here: they stay on the daily Vercel cron (vercel.json).
+# Needs repo variable APP_BASE_URL (docs/runbook.md); skips with a notice until it exists.
+# Side effect: keeps the Supabase Free project from pausing after a week without activity.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  health:
+    name: Health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+    steps:
+      - name: Health check
+        run: |
+          if [ -z "$APP_BASE_URL" ]; then
+            echo "::notice::Uptime check not configured (set repository variable APP_BASE_URL) — skipping."
+            exit 0
+          fi
+          curl --fail-with-body -sS --retry 2 --retry-delay 15 --retry-all-errors --max-time 30 "$APP_BASE_URL/api/health"
