@@ -84,7 +84,7 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 
 ## Observabilidade
 
-Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`, `page.failed`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD. Erros de página mostram `error.tsx` (liga e app) com a referência (`digest`) que aparece nos logs.
+Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`, `page.failed`, `request.failed` via `src/instrumentation.ts`, `cron.run`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD. Rotinas (cron a cada 15 min, backups, alertas) e incidentes: [`runbook.md`](runbook.md). Erros de página mostram `error.tsx` (liga e app) com a referência (`digest`) que aparece nos logs.
 
 ## Desempenho do pedido
 
@@ -102,4 +102,4 @@ Cada página de liga é dinâmica e renderizada por pedido. O custo dominante s�
 
 Medido localmente (build de produção, mesmo fluxo): por página, prefetches 12–16 → 0–7 e instruções SQL −20% a −55% (ex.: Finanças 29 → 15, Plantel 39 → 18). Ao criar uma consulta nova, preferir juntar leituras da mesma página numa só chamada `withUser` em vez de várias em paralelo (cada uma ocupa uma ligação do pool).
 
-**Não usar `loading.tsx` em `src/app/g/[gameId]/` por agora**: com esse boundary, as Server Actions das páginas da liga (escolher clube, iniciar liga) deixam de atualizar a página. Ver o erro `null (reading 'status')` no Resumo, que já existe em `main` e deve ser resolvido primeiro.
+**Não usar `loading.tsx` em `src/app/g/[gameId]/` por agora**: com esse boundary, as Server Actions das páginas da liga (escolher clube, iniciar liga) deixam de atualizar a página. Causa provável: o layout e a página renderizam em paralelo — o `notFound()` do layout (não-membro / id desconhecido) não impede a página de correr, e 8 páginas fazem `(await getGame(…))!` e rebentam com `null (reading 'status')` (visível nos logs `request.failed`). Sem boundary o erro fica escondido pelo 404 do layout; com boundary fica dentro do Suspense da página. Corrigir primeiro: `const game = await getGame(…); if (!game) notFound();` nas páginas.
