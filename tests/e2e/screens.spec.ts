@@ -46,7 +46,9 @@ test("every game screen renders in the v2 shell (dark + light, 360 + 1440)", asy
   const matchHref = await page.locator(`a[href*="/matches/"]`).first().getAttribute("href");
   if (matchHref) await page.goto(matchHref);
   const playerHref = matchHref ? await page.locator(`a[href*="/players/"]`).first().getAttribute("href") : null;
-  const routes = [...ROUTES.map((r) => gameUrl + r), ...(playerHref ? [playerHref] : []), ...(matchHref ? [matchHref] : [])];
+  await page.goto(`${gameUrl}/table`);
+  const clubHref = await page.locator(`a[href*="/clubs/"]`).first().getAttribute("href");
+  const routes = [...ROUTES.map((r) => gameUrl + r), ...[playerHref, matchHref, clubHref].filter((h): h is string => !!h)];
 
   for (const theme of ["dark", "light"] as const) {
     await page.evaluate((t) => localStorage.setItem("tl-theme", t), theme);

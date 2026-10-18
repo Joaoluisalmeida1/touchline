@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, ClipboardList, Landmark, Flag, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Bell, CalendarDays, ClipboardList, Landmark, Flag, ListOrdered, Newspaper, Play, Radio, Trophy, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
+import { ClubLink } from "@/components/club-link";
 import { Crest } from "@/components/crest";
 import { AnimatedNumber } from "@/components/fx/animated-number";
 import { Countdown } from "@/components/fx/countdown";
@@ -15,6 +16,8 @@ import { getWeekPending } from "@/server/week-queries";
 import { getBoardMini } from "@/server/club-queries";
 import { getPool } from "@/server/db";
 import { ensureWeek } from "@/server/services/week";
+
+const NOTIF_VISIBLE = 5;
 
 const NOTIF_ICON: Record<string, React.ReactNode> = {
   member_joined: <UserPlus />, game_started: <Flag />, matchday_completed: <CalendarDays />, season_completed: <Trophy />,
@@ -107,13 +110,13 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
                           const id = side === "home" ? next.home_club_id : next.away_club_id;
                           const mine = id === game.my_club_id;
                           const el = (
-                            <div key={side} className={cn("flex min-w-0 flex-col items-center gap-2 text-center", side === "away" && "order-3")}>
+                            <ClubLink key={side} gameId={gameId} clubId={id} className={cn("flex min-w-0 flex-col items-center gap-2 text-center", side === "away" && "order-3")}>
                               <Crest id={id} name={side === "home" ? next.home_name : next.away_name} short={side === "home" ? next.home_short : next.away_short}
                                 color={side === "home" ? next.home_color : next.away_color} color2={side === "home" ? next.home_color2 : next.away_color2}
                                 size={76} className="drop-shadow-[0_10px_24px_rgb(0_0_0/.55)]" />
                               <p className={cn("headline line-clamp-2 text-lg sm:text-2xl", mine ? "text-ink" : "text-ink/85")}>{side === "home" ? next.home_name : next.away_name}</p>
                               <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-faint">{side === "home" ? "Casa" : "Fora"}{mine ? " · tu" : ""}</span>
-                            </div>
+                            </ClubLink>
                           );
                           return el;
                         })}
@@ -180,6 +183,47 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
             </StaggerItem>
           </>
         )}
+
+        <StaggerItem>
+          <Card className="p-0 sm:p-0">
+            <div className="p-4 pb-0 sm:p-5 sm:pb-0">
+              <CardTitle icon={<ListOrdered />} action={<Link href={`/g/${gameId}/table`} className="flex items-center gap-1 text-xs font-semibold text-muted hover:text-accent">Tabela completa <ArrowRight className="size-3" /></Link>}>Classificação</CardTitle>
+            </div>
+            {standings.length === 0 ? <p className="px-5 pb-5 text-sm text-muted">Disponível quando a liga começar.</p> : (
+              <table className="w-full text-sm">
+                <thead className="text-left text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                  <tr><th className="w-10 pb-1.5 pl-4 sm:pl-5">#</th><th className="pb-1.5">Clube</th><th className="w-9 pb-1.5 text-center">J</th>
+                    <th className="w-10 pb-1.5 text-center">DG</th><th className="hidden pb-1.5 sm:table-cell">Forma</th><th className="w-12 pb-1.5 pr-4 text-right sm:pr-5">Pts</th></tr>
+                </thead>
+                <tbody>
+                  {standings.slice(0, 10).map((s, i) => {
+                    const mine = s.club_id === game.my_club_id;
+                    return (
+                      <tr key={s.club_id} className={cn("relative transition-colors hover:bg-surface-2/50", mine && "bg-accent/[.07]")}>
+                        <td className="relative py-1.5 pl-4 sm:pl-5">
+                          {mine && <span aria-hidden className="absolute inset-y-1 left-0 w-[3px] rounded-r bg-accent" />}
+                          <span className={cn("font-display text-base font-bold tabular", i === 0 ? "text-accent" : "text-faint")}>{i + 1}</span>
+                        </td>
+                        <td className="py-1.5">
+                          <ClubLink gameId={gameId} clubId={s.club_id} className="flex min-w-0 items-center gap-2.5">
+                            <Crest id={s.club_id} name={s.name_snapshot} short={s.short_name} color={s.primary_color} color2={s.secondary_color} size={22} />
+                            <span className={cn("truncate", mine ? "font-bold" : "font-medium")}>{s.name_snapshot}</span>
+                          </ClubLink>
+                        </td>
+                        <td className="py-1.5 text-center tabular text-muted">{s.played}</td>
+                        <td className={cn("py-1.5 text-center tabular", s.gd > 0 ? "text-accent" : s.gd < 0 ? "text-danger" : "text-muted")}>{s.gd > 0 ? `+${s.gd}` : s.gd}</td>
+                        <td className="hidden py-1.5 sm:table-cell">{s.form && <FormStrip form={s.form.slice(-5)} size="sm" />}</td>
+                        <td className="py-1.5 pr-4 text-right font-display text-lg font-extrabold tabular sm:pr-5">{s.points}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {standings.length > 10 && <p className="px-4 pb-3 text-xs text-faint sm:px-5">+{standings.length - 10} clubes na tabela completa</p>}
+            <div className="h-2" />
+          </Card>
+        </StaggerItem>
       </Stagger>
 
       <Stagger className="space-y-5" gap={0.08}>
@@ -225,50 +269,40 @@ export default async function Overview({ params }: { params: Promise<{ gameId: s
           </StaggerItem>
         )}
         <StaggerItem>
-          <Card className="p-0 sm:p-0">
-            <div className="p-4 pb-0 sm:p-5 sm:pb-0">
-              <CardTitle action={<Link href={`/g/${gameId}/table`} className="flex items-center gap-1 text-xs font-semibold text-muted hover:text-accent">Ver tudo <ArrowRight className="size-3" /></Link>}>Classificação</CardTitle>
-            </div>
-            {standings.length === 0 ? <p className="px-5 pb-5 text-sm text-muted">Disponível quando a liga começar.</p> : (
-              <ol className="pb-2">
-                {standings.slice(0, 8).map((s, i) => {
-                  const mine = s.club_id === game.my_club_id;
-                  return (
-                    <li key={s.club_id} className={cn("relative flex items-center gap-2.5 px-4 py-2 text-sm sm:px-5", mine && "bg-accent/[.07]")}>
-                      {mine && <span aria-hidden className="absolute inset-y-1 left-0 w-[3px] rounded-r bg-accent" />}
-                      <span className={cn("w-5 text-right font-display text-base font-bold tabular", i === 0 ? "text-accent" : "text-faint")}>{i + 1}</span>
-                      <Crest id={s.club_id} name={s.name_snapshot} short={s.short_name} color={s.primary_color} color2={s.secondary_color} size={22} />
-                      <span className={cn("flex-1 truncate", mine ? "font-bold" : "font-medium")}>{s.name_snapshot}</span>
-                      <span className="hidden sm:inline-flex">{s.form && <FormStrip form={s.form.slice(-3)} size="sm" />}</span>
-                      <span className="w-7 text-right font-display text-lg font-extrabold tabular">{s.points}</span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </Card>
-        </StaggerItem>
-        <StaggerItem>
           <Card>
             <CardTitle icon={<Bell />} action={unread > 0 ? (
               <form action={markNotificationsReadAction}><input type="hidden" name="gameId" value={gameId} /><button className="text-xs font-semibold text-muted hover:text-accent">Marcar lidas</button></form>
             ) : null}>Notificações {unread > 0 && <Badge tone="accent">{unread}</Badge>}</CardTitle>
-            {notifications.length === 0 ? <p className="text-sm text-muted">Sem novidades.</p> : (
-              <ul className="relative space-y-3 text-sm before:absolute before:inset-y-2 before:left-[15px] before:w-px before:bg-line">
-                {notifications.map((n) => (
-                  <li key={n.id} className={cn("relative flex gap-3", n.read_at ? "text-muted" : "text-ink")}>
-                    <span className={cn("relative z-10 flex size-[31px] shrink-0 items-center justify-center rounded-full ring-1 [&_svg]:size-3.5",
-                      n.read_at ? "bg-surface-2 text-faint ring-line" : "bg-accent/15 text-accent ring-accent/30")}>
-                      {NOTIF_ICON[n.type] ?? <Bell />}
-                    </span>
-                    <span className="min-w-0 pt-1 leading-5">
-                      {notificationText(n.type, n.payload_json)}
-                      <span className="block text-[11px] text-faint">{new Date(n.created_at).toLocaleString("pt-PT", { timeZone: game.timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {notifications.length === 0 ? <p className="text-sm text-muted">Sem novidades.</p> : (() => {
+              // newest first; only the latest few are shown so the card never grows the page — the rest on demand
+              const item = (n: (typeof notifications)[number]) => (
+                <li key={n.id} className={cn("relative flex gap-3", n.read_at ? "text-muted" : "text-ink")}>
+                  <span className={cn("relative z-10 flex size-[31px] shrink-0 items-center justify-center rounded-full ring-1 [&_svg]:size-3.5",
+                    n.read_at ? "bg-surface-2 text-faint ring-line" : "bg-accent/15 text-accent ring-accent/30")}>
+                    {NOTIF_ICON[n.type] ?? <Bell />}
+                  </span>
+                  <span className="min-w-0 pt-1 leading-5">
+                    {notificationText(n.type, n.payload_json)}
+                    <span className="block text-[11px] text-faint">{new Date(n.created_at).toLocaleString("pt-PT", { timeZone: game.timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                  </span>
+                </li>
+              );
+              const list = "relative space-y-3 text-sm before:absolute before:inset-y-2 before:left-[15px] before:w-px before:bg-line";
+              const rest = notifications.slice(NOTIF_VISIBLE);
+              return (
+                <>
+                  <ul className={list}>{notifications.slice(0, NOTIF_VISIBLE).map(item)}</ul>
+                  {rest.length > 0 && (
+                    <details className="group mt-3">
+                      <summary className="cursor-pointer list-none text-center text-xs font-semibold text-muted transition hover:text-accent [&::-webkit-details-marker]:hidden">
+                        <span className="group-open:hidden">Ver mais {rest.length}</span><span className="hidden group-open:inline">Mostrar menos</span>
+                      </summary>
+                      <ul className={cn(list, "mt-3 max-h-80 overflow-y-auto pr-1")}>{rest.map(item)}</ul>
+                    </details>
+                  )}
+                </>
+              );
+            })()}
           </Card>
         </StaggerItem>
       </Stagger>

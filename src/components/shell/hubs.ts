@@ -50,5 +50,6 @@ export function locate(path: string, base: string, all: Hub[]): { hub: Hub; tabH
   }
   if (rest.startsWith("/matches/")) return { hub: all.find((h) => h.id === "jogo")!, tabHref: base + "/fixtures" };
   if (rest.startsWith("/players/")) return { hub: all.find((h) => h.id === "equipa")!, tabHref: base + "/squad" };
+  if (rest.startsWith("/clubs/")) return { hub: all.find((h) => h.id === "liga")!, tabHref: base + "/table" };
   return { hub: all[0], tabHref: rest === "" ? base : "" };
 }

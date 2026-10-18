@@ -50,6 +50,7 @@ describe("hubs", () => {
   it("locates nested pages", () => {
     expect(locate(`${base}/matches/x`, base, all).hub.id).toBe("jogo");
     expect(locate(`${base}/players/x`, base, all).hub.id).toBe("equipa");
+    expect(locate(`${base}/clubs/x`, base, all)).toMatchObject({ hub: { id: "liga" }, tabHref: `${base}/table` }); // not the user's own /club
     expect(locate(`${base}/finances`, base, all)).toMatchObject({ tabHref: `${base}/finances` });
     expect(locate(base, base, all)).toMatchObject({ tabHref: base });
     expect(locate(`${base}/clubhouse`, base, all).hub.id).toBe("hoje"); // no false prefix match on /club

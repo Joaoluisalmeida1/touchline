@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeftRight, Award, Lock, MessagesSquare, Newspaper, Trash2, Trophy, Users } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { SectionTabs } from "@/components/club/section-tabs";
+import { ClubLink } from "@/components/club-link";
 import { Crest } from "@/components/crest";
 import { WallReactions } from "@/components/social/reactions";
 import { Badge, Card, CardTitle, Empty, cn, eur, inputCls } from "@/components/ui";
@@ -114,10 +115,12 @@ function Managers({ gameId, managers, me }: { gameId: string; managers: ManagerC
         return (
           <Card key={m.user_id} glow={m.user_id === me}>
             <div className="flex items-center gap-3">
-              <Crest id={m.club_id} name={m.club} short={m.short_name} color={m.primary_color} color2={m.secondary_color} size={40} />
+              <ClubLink gameId={gameId} clubId={m.club_id} label={m.club}>
+                <Crest id={m.club_id} name={m.club} short={m.short_name} color={m.primary_color} color2={m.secondary_color} size={40} />
+              </ClubLink>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-xl font-bold uppercase">{m.display_name}{m.user_id === me && <span className="ml-2 text-xs text-faint">(tu)</span>}</p>
-                <p className="truncate text-xs text-muted">{m.club}</p>
+                <ClubLink gameId={gameId} clubId={m.club_id} className="block truncate text-xs text-muted">{m.club}</ClubLink>
               </div>
               {m.titles > 0 && <span className="flex items-center gap-1 font-display text-xl font-bold text-[#ffcc4d]"><Trophy className="size-5" />{m.titles}</span>}
             </div>

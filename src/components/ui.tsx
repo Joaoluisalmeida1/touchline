@@ -9,10 +9,13 @@ export function cn(...c: (string | false | null | undefined)[]) {
 /* ------------------------------------------------------------------ surfaces */
 
 export function Card({ className, children, interactive, glow, ...rest }: ComponentProps<"section"> & { interactive?: boolean; glow?: boolean }) {
+  // cn() doesn't merge classes, so a caller's p-0/p-3 would lose to the default in CSS order: drop the default instead
+  const ownPadding = /(^|\s)(sm:)?p-/.test(className ?? "");
   return (
     <section
       className={cn(
-        "surface relative min-w-0 rounded-[var(--radius-card)] p-4 sm:p-5",
+        "surface relative min-w-0 rounded-[var(--radius-card)]",
+        !ownPadding && "p-4 sm:p-5",
         interactive && "transition duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--tl-shadow)]",
         glow && "border-accent/30",
         className,
@@ -207,11 +210,19 @@ export const POS_PILL: Record<string, string> = {
   ATT: "bg-rose-500/10 text-rose-800 ring-rose-600/30 dark:text-rose-300 dark:ring-rose-300/30",
 };
 
+/** Money from cents: "€25.9M", "€600k", negatives as "−€160k" (sign before the symbol). compact=false → "€232 800". */
 export function eur(cents: number | string | null | undefined, compact = true): string {
   if (cents === null || cents === undefined) return "—";
   const v = Number(cents) / 100;
-  if (!compact) return `€${Math.round(v).toLocaleString("pt-PT")}`;
   const a = Math.abs(v);
-  const s = a >= 1e6 ? `${(v / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M` : a >= 1e3 ? `${Math.round(v / 1e3)}k` : `${Math.round(v)}`;
-  return `€${s}`;
+  const sign = Math.round(v) < 0 ? "−" : "";
+  if (!compact) return `${sign}€${Math.round(a).toLocaleString("pt-PT")}`;
+  const s = a >= 1e6 ? `${(a / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M` : a >= 1e3 ? `${Math.round(a / 1e3)}k` : `${Math.round(a)}`;
+  return `${sign}€${s}`;
+}
+
+/** Like eur() but always signed: "+€600k" / "−€160k" / "€0". */
+export function eurSigned(cents: number | string | null | undefined, compact = true): string {
+  const v = Number(cents ?? 0);
+  return Math.round(v / 100) > 0 ? `+${eur(v, compact)}` : eur(v, compact);
 }

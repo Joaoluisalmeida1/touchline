@@ -171,10 +171,17 @@ test("two friends play a matchday end to end", async ({ browser }) => {
   await r.getByRole("button", { name: "Fazer proposta" }).click();
   await expect(r.getByText(/Proposta aceite|Proposta enviada|Recusada/).first()).toBeVisible();
   await r.goto(`${gameUrl}/finances`);
-  await expect(r.getByRole("columnheader", { name: "Saldo" })).toBeVisible();
-  await expect(r.getByText("Contas da época (blocos de 4 jornadas)")).toBeVisible();
+  await expect(r.getByText("Saldo do clube")).toBeVisible();
+  await expect(r.getByText("Receitas e despesas por jornada")).toBeVisible();
+  await expect(r.getByText("Movimentos por jornada")).toBeVisible();
   await r.screenshot({ path: "test-results/finances-desktop.png", fullPage: true });
   await expect(r.getByText("Saldo inicial").first()).toBeVisible();
+
+  // Clubs in the table open their squad page
+  await r.goto(`${gameUrl}/table`);
+  await r.locator('a[href*="/clubs/"]').first().click();
+  await expect(r).toHaveURL(/\/clubs\/[0-9a-f-]+$/);
+  await expect(r.getByRole("columnheader", { name: "Jogador" })).toBeVisible();
 
   // An outsider gets 404 for the league
   const outsider = await (await browser.newContext()).newPage();

@@ -1,155 +1,186 @@
-import { Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, PiggyBank, Receipt, Wallet } from "lucide-react";
 import { AnimatedNumber } from "@/components/fx/animated-number";
 import { Bar, Stagger, StaggerItem } from "@/components/fx/motion";
-import { Card, CardTitle, Empty, cn, eur } from "@/components/ui";
+import { Card, CardTitle, Empty, cn, eur, eurSigned } from "@/components/ui";
 import { requireUser } from "@/server/auth";
-import { getFinances, getGame } from "@/server/queries";
+import { getFinances, getGame, getRoundFlows } from "@/server/queries";
 import { getSeasonPnl } from "@/server/club-queries";
 
 export const metadata = { title: "Finanças" };
 
+/** Plain-language names for ledger entries (unknown types fall back to a readable version of the key). */
 const LABEL: Record<string, string> = {
-  initial_balance: "Saldo inicial", transfer_sale: "Vendas", transfer_purchase: "Compras", gate_receipts: "Bilheteira",
-  sponsorship: "Patrocínios", wages: "Salários", prize_money: "Prémios", result_bonus: "Prémios de jogo", adjustment: "Ajustes",
-  staff_wages: "Staff", infrastructure: "Obras",
+  initial_balance: "Saldo inicial", transfer_sale: "Venda de jogadores", transfer_purchase: "Compra de jogadores", gate_receipts: "Bilheteira",
+  sponsorship: "Patrocínios", wages: "Salários dos jogadores", prize_money: "Prémios da liga", result_bonus: "Prémios por resultado",
+  adjustment: "Outros acertos", staff_wages: "Salários do staff", infrastructure: "Obras no estádio",
 };
-const REVENUE = new Set(["gate_receipts", "sponsorship", "prize_money", "result_bonus"]);
+const label = (t: string) => LABEL[t] ?? t.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 export default async function Finances({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = await params;
   const user = await requireUser();
   const game = (await getGame(user.id, gameId))!;
   if (!game.my_club_id) return <Empty title="Ainda não tens clube" icon={<Wallet />} />;
-  const [{ club, ledger, byType }, pnl] = await Promise.all([getFinances(user.id, game.my_club_id), getSeasonPnl(user.id, game.my_club_id, game.current_season)]);
-  const blocks = [...new Set(pnl.map((r) => r.block))].sort((a, b) => a - b);
-  const types = [...new Set(pnl.map((r) => r.event_type))].sort((a, b) => Number(REVENUE.has(b)) - Number(REVENUE.has(a)) || a.localeCompare(b));
-  const cell = (b: number, t: string) => Number(pnl.find((r) => r.block === b && r.event_type === t)?.total ?? 0);
-  const revenue = pnl.filter((r) => REVENUE.has(r.event_type)).reduce((s2, r) => s2 + Number(r.total), 0);
-  const wagesPaid = -pnl.filter((r) => r.event_type === "wages" || r.event_type === "staff_wages").reduce((s2, r) => s2 + Number(r.total), 0);
-  const ratio = revenue > 0 ? wagesPaid / revenue : 0;
-  const played = Math.max(1, game.current_matchday);
-  const net = pnl.filter((r) => r.event_type !== "transfer_sale" && r.event_type !== "transfer_purchase").reduce((s2, r) => s2 + Number(r.total), 0);
-  const projection = Number(club?.cash_cents ?? 0) + Math.round((net / played) * Math.max(0, (game.total_rounds ?? 0) - game.current_matchday));
+  const season = game.current_season;
+  const [{ club, ledger }, pnl, flows] = await Promise.all([
+    getFinances(user.id, game.my_club_id), getSeasonPnl(user.id, game.my_club_id, season), getRoundFlows(user.id, game.my_club_id, season),
+  ]);
   if (!club) return <Empty title="Sem dados" />;
-  const available = Number(club.cash_cents) - Number(club.reserved_cents);
-  const flows = byType.filter((r) => r.event_type !== "initial_balance");
-  const maxAbs = Math.max(1, ...flows.map((r) => Math.abs(Number(r.total))));
-  // balance sparkline (oldest → newest)
-  const series = [...ledger].reverse().map((l) => Number(l.balance_after_cents));
-  const w = 600, h = 120;
-  const lo = Math.min(...series, 0), hi = Math.max(...series, 1);
-  const pts = series.map((v, i) => [series.length === 1 ? w / 2 : (i * w) / (series.length - 1), h - 8 - ((v - lo) / (hi - lo || 1)) * (h - 16)]);
-  const path = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const kpis: [string, number, string?][] = [
-    ["Saldo", Number(club.cash_cents)], ["Reservado em propostas", Number(club.reserved_cents)], ["Disponível", available, "accent"], ["Folha salarial / jornada", Number(club.wage_bill)],
-  ];
+
+  const cash = Number(club.cash_cents), reserved = Number(club.reserved_cents), available = cash - reserved;
+  // season totals per type (transfers kept apart: they are one-off, not the running economy)
+  const totals = new Map<string, number>();
+  for (const r of pnl) totals.set(r.event_type, (totals.get(r.event_type) ?? 0) + Number(r.total));
+  const isTransfer = (t: string) => t === "transfer_sale" || t === "transfer_purchase";
+  const income = [...totals].filter(([t, v]) => v > 0 && !isTransfer(t)).sort((a, b) => b[1] - a[1]);
+  const spending = [...totals].filter(([t, v]) => v < 0 && !isTransfer(t)).sort((a, b) => a[1] - b[1]);
+  const transfers = (totals.get("transfer_sale") ?? 0) + (totals.get("transfer_purchase") ?? 0);
+  const incomeTotal = income.reduce((s, [, v]) => s + v, 0);
+  const spendingTotal = -spending.reduce((s, [, v]) => s + v, 0);
+  const wages = -((totals.get("wages") ?? 0) + (totals.get("staff_wages") ?? 0));
+  const ratio = incomeTotal > 0 ? wages / incomeTotal : 0;
+  const played = Math.max(1, game.current_matchday);
+  const runningNet = incomeTotal - spendingTotal;
+  const perRound = runningNet / played;
+  const left = Math.max(0, Number(game.total_rounds ?? 0) - game.current_matchday);
+  const projection = cash + Math.round(perRound * left);
+  const sinceStart = flows.seasonStart !== null ? cash - flows.seasonStart : null;
+
+  // chart: money in (up) and out (down) per matchday
+  const rounds = flows.rounds.filter((r) => r.round > 0);
+  const peak = Math.max(1, ...rounds.map((r) => Math.max(r.income, -r.expenses)));
+  const W = 720, H = 200, mid = H / 2, slot = rounds.length ? W / rounds.length : W, bw = Math.min(36, slot * 0.36);
+
+  // movements grouped by matchday (newest first)
+  const groups: { key: string; season: number | null; round: number | null; rows: typeof ledger; net: number }[] = [];
+  for (const l of ledger) {
+    const key = `${l.season_number}-${l.round_number}`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) groups.push(g = { key, season: l.season_number, round: l.round_number, rows: [], net: 0 });
+    g.rows.push(l);
+    if (l.event_type !== "initial_balance") g.net += Number(l.amount_cents);
+  }
+
   return (
     <div className="space-y-5">
-      <Stagger className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpis.map(([k, v, tone]) => (
-          <StaggerItem key={k}>
-            <div className={cn("surface h-full rounded-[var(--radius-card)] p-4", tone === "accent" && "border-accent/35")}>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{k}</p>
-              <p className={cn("mt-2 font-display text-3xl font-extrabold leading-none sm:text-4xl", v < 0 ? "text-danger" : tone === "accent" ? "text-accent" : "text-ink")}>
-                <AnimatedNumber value={v} format="eur" />
-              </p>
-            </div>
-          </StaggerItem>
-        ))}
+      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerItem className="sm:col-span-2">
+          <div className="surface h-full rounded-[var(--radius-card)] border-accent/35 p-5">
+            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint"><Wallet className="size-3.5" />Saldo do clube</p>
+            <p className={cn("mt-2 font-display text-5xl font-extrabold leading-none tabular", cash < 0 ? "text-danger" : "text-ink")}><AnimatedNumber value={cash} format="eur" /></p>
+            <p className="mt-2 text-sm text-muted">
+              {sinceStart !== null && <><b className={cn("tabular", sinceStart < 0 ? "text-danger" : "text-up")}>{eurSigned(sinceStart)}</b> desde o início da época · </>}
+              {reserved > 0 ? <>{eur(reserved)} reservado em propostas · <b className="text-ink">{eur(available)} disponível</b></> : <>tudo disponível para contratações</>}
+            </p>
+          </div>
+        </StaggerItem>
+        <StaggerItem>
+          <div className="surface h-full rounded-[var(--radius-card)] p-5">
+            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint"><CalendarDays className="size-3.5" />Média por jornada</p>
+            <p className={cn("mt-2 font-display text-3xl font-extrabold leading-none tabular", perRound < 0 ? "text-danger" : "text-up")}>{eurSigned(perRound)}</p>
+            <p className="mt-2 text-xs text-muted">{perRound >= 0 ? "Estás a ganhar dinheiro a cada jornada." : "Estás a gastar mais do que recebes."}</p>
+          </div>
+        </StaggerItem>
+        <StaggerItem>
+          <div className="surface h-full rounded-[var(--radius-card)] p-5">
+            <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-faint"><PiggyBank className="size-3.5" />Fim da época (previsão)</p>
+            <p className={cn("mt-2 font-display text-3xl font-extrabold leading-none tabular", projection < 0 ? "text-danger" : "text-ink")}>{eur(projection)}</p>
+            <p className="mt-2 text-xs text-muted">{left > 0 ? `Se tudo continuar igual nas ${left} jornadas que faltam.` : "Época terminada."}</p>
+          </div>
+        </StaggerItem>
       </Stagger>
 
-      {series.length > 1 && (
+      {rounds.length > 0 && (
         <Card>
-          <CardTitle>Evolução do saldo</CardTitle>
-          <svg viewBox={`0 0 ${w} ${h}`} className="h-32 w-full" preserveAspectRatio="none" role="img" aria-label="Evolução do saldo ao longo dos movimentos">
-            <defs>
-              <linearGradient id="fin-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--color-accent)" stopOpacity=".28" /><stop offset="1" stopColor="var(--color-accent)" stopOpacity="0" /></linearGradient>
-            </defs>
-            <path d={`${path} L${w},${h} L0,${h} Z`} fill="url(#fin-fill)" />
-            <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          <CardTitle icon={<Receipt />} action={<span className="flex items-center gap-3 text-xs text-muted"><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-up" />Entrou</span><span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-danger" />Saiu</span></span>}>Receitas e despesas por jornada</CardTitle>
+          <svg viewBox={`0 0 ${W} ${H + 28}`} className="h-auto w-full sm:h-56" role="img" aria-label={`Receitas e despesas por jornada, ${rounds.length} jornadas`}>
+            <line x1="0" x2={W} y1={mid} y2={mid} stroke="var(--color-line-strong)" strokeWidth="1" />
+            {rounds.map((r, i) => {
+              const x = i * slot + slot / 2;
+              // leave room above/below the tallest bar for its net label
+              const up = (r.income / peak) * (mid - 22), down = (-r.expenses / peak) * (mid - 22), net = r.income + r.expenses;
+              return (
+                <g key={r.round}>
+                  <title>{`Jornada ${r.round}: entrou ${eur(r.income)}, saiu ${eur(-r.expenses)}, saldo ${eurSigned(net)}`}</title>
+                  <rect x={x - bw - 1} y={mid - up} width={bw} height={Math.max(1, up)} rx="3" fill="var(--color-up)" opacity=".85" />
+                  <rect x={x + 1} y={mid} width={bw} height={Math.max(1, down)} rx="3" fill="var(--color-danger)" opacity=".8" />
+                  {/* the svg scales down on phones: CSS font sizes (which beat the attribute) keep the labels readable there */}
+                  <text x={x} y={H + 18} textAnchor="middle" fontSize="11" className="text-[20px] sm:text-[11px]" fill="var(--color-faint)">J{r.round}</text>
+                  {rounds.length <= 14 && <text x={x} y={net >= 0 ? mid - up - 6 : mid + down + 16} textAnchor="middle" fontSize="10" fontWeight="700" className="max-sm:hidden" fill={net >= 0 ? "var(--color-up)" : "var(--color-danger)"}>{eurSigned(net)}</text>}
+                </g>
+              );
+            })}
           </svg>
         </Card>
       )}
 
-      {blocks.length > 0 && (
-        <Card className="overflow-hidden">
-          <CardTitle action={<span className="text-xs text-muted">Projeção no fim da época: <b className={cn("tabular", projection < 0 ? "text-danger" : "text-ink")}>{eur(projection)}</b></span>}>Contas da época (blocos de 4 jornadas)</CardTitle>
-          <div className="mb-4">
-            <div className="mb-1 flex justify-between text-xs"><span className="text-muted">Salários / receitas</span><span className={cn("font-bold tabular", ratio > 0.7 ? "text-danger" : "text-ink")}>{Math.round(ratio * 100)}%</span></div>
-            <div className="relative h-2 rounded-full bg-line">
-              <div className={cn("h-full rounded-full", ratio > 0.7 ? "bg-danger" : "bg-accent")} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
-              <span className="absolute -top-1 h-4 w-0.5 bg-warn" style={{ left: "70%" }} title="Linha de alerta: 70%" />
-            </div>
-            <p className="mt-1 text-[11px] text-faint">Acima de 70% as contas ficam apertadas — a direção nota.</p>
-          </div>
-          <div className="-mx-4 overflow-x-auto sm:-mx-5">
-            <table className="w-full min-w-[520px] text-sm">
-              <thead className="text-left text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
-                <tr className="border-b border-line"><th className="px-4 py-2 sm:px-5">Tipo</th>{blocks.map((b) => <th key={b} className="px-3 py-2 text-right">J{b * 4 + 1}–{b * 4 + 4}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-line/60">
-                {types.map((t) => (
-                  <tr key={t}>
-                    <td className="px-4 py-2 font-medium sm:px-5">{LABEL[t] ?? t}</td>
-                    {blocks.map((b) => { const v = cell(b, t); return <td key={b} className={cn("px-3 py-2 text-right tabular", v < 0 ? "text-danger" : v > 0 ? "text-accent" : "text-faint")}>{v ? eur(v) : "—"}</td>; })}
-                  </tr>
-                ))}
-                <tr className="font-bold">
-                  <td className="px-4 py-2 sm:px-5">Resultado</td>
-                  {blocks.map((b) => { const v = types.reduce((s2, t) => s2 + cell(b, t), 0); return <td key={b} className={cn("px-3 py-2 text-right tabular", v < 0 ? "text-danger" : "text-accent")}>{eur(v)}</td>; })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <Card>
-          <CardTitle>Resumo por tipo</CardTitle>
-          <ul className="space-y-3 text-sm">
-            {byType.map((r, i) => {
-              const v = Number(r.total);
-              return (
-                <li key={r.event_type}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-muted">{LABEL[r.event_type] ?? r.event_type}</span>
-                    <span className={cn("font-display text-base font-bold tabular", v < 0 ? "text-danger" : "text-accent")}>{eur(r.total)}</span>
-                  </div>
-                  {r.event_type !== "initial_balance" && (
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
-                      <Bar pct={(Math.abs(v) / maxAbs) * 100} delay={i * 0.04} className={cn("h-full rounded-full", v < 0 ? "bg-danger" : "bg-accent")} />
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-        <Card className="overflow-hidden p-0 sm:p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-sm">
-              <thead className="text-left text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
-                <tr className="border-b border-line"><th className="px-4 py-3">Quando</th><th className="px-4 py-3">Movimento</th><th className="px-4 py-3 text-right">Valor</th><th className="px-4 py-3 text-right">Saldo</th></tr>
-              </thead>
-              <tbody className="divide-y divide-line/60">
-                {ledger.map((l) => {
-                  const v = Number(l.amount_cents);
+      <div className="grid gap-5 lg:grid-cols-2">
+        {[
+          { title: "De onde vem o dinheiro", icon: <ArrowUpRight />, rows: income, total: incomeTotal, tone: "up" as const },
+          { title: "Para onde vai", icon: <ArrowDownRight />, rows: spending, total: spendingTotal, tone: "danger" as const },
+        ].map((col) => (
+          <Card key={col.title}>
+            <CardTitle icon={col.icon} action={<span className={cn("font-display text-lg font-extrabold tabular", col.tone === "up" ? "text-up" : "text-danger")}>{eur(col.total)}</span>}>{col.title} · época {season}</CardTitle>
+            {col.rows.length === 0 ? <p className="text-sm text-muted">Nada ainda nesta época.</p> : (
+              <ul className="space-y-3 text-sm">
+                {col.rows.map(([t, v], i) => {
+                  const share = col.total ? Math.abs(v) / col.total : 0;
                   return (
-                    <tr key={l.id} className="transition-colors hover:bg-surface-2/50">
-                      <td className="px-4 py-2.5"><span className="rounded-md bg-surface-2 px-1.5 py-0.5 font-display text-xs font-bold text-muted ring-1 ring-line">E{l.season_number ?? "-"} · J{l.round_number ?? "-"}</span></td>
-                      <td className="px-4 py-2.5 font-medium">{LABEL[l.event_type] ?? l.event_type}</td>
-                      <td className={cn("px-4 py-2.5 text-right font-semibold tabular", v < 0 ? "text-danger" : "text-accent")}>{v > 0 ? "+" : ""}{eur(l.amount_cents, false)}</td>
-                      <td className="px-4 py-2.5 text-right tabular text-muted">{eur(l.balance_after_cents)}</td>
-                    </tr>
+                    <li key={t}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium">{label(t)}</span>
+                        <span className="tabular text-muted"><b className="text-ink">{eur(Math.abs(v))}</b> · {Math.round(share * 100)}%</span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
+                        <Bar pct={share * 100} delay={i * 0.04} className={cn("h-full rounded-full", col.tone === "up" ? "bg-up" : "bg-danger")} />
+                      </div>
+                    </li>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+              </ul>
+            )}
+            {col.tone === "danger" && incomeTotal > 0 && (
+              <div className="mt-5 rounded-xl border border-line bg-bg/50 p-3">
+                <div className="mb-1 flex justify-between text-xs"><span className="text-muted">Salários comem {Math.round(ratio * 100)}% das receitas</span><span className={cn("font-bold", ratio > 0.7 ? "text-danger" : "text-up")}>{ratio > 0.7 ? "Apertado" : "Saudável"}</span></div>
+                <div className="relative h-2 rounded-full bg-line">
+                  <div className={cn("h-full rounded-full", ratio > 0.7 ? "bg-danger" : "bg-up")} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+                  <span className="absolute -top-1 h-4 w-0.5 bg-warn" style={{ left: "70%" }} title="Limite: 70%" />
+                </div>
+                <p className="mt-1.5 text-[11px] text-faint">Acima de 70% a direção fica preocupada com as contas.</p>
+              </div>
+            )}
+          </Card>
+        ))}
       </div>
-      <p className="text-xs text-faint">Receitas, salários, patrocínios e prémios são regras do jogo (economy-v2), não dados reais. Cada movimento tem uma chave de idempotência — nunca é aplicado duas vezes.</p>
+      {transfers !== 0 && (
+        <p className="text-sm text-muted">Transferências nesta época: <b className={cn("tabular", transfers < 0 ? "text-danger" : "text-up")}>{eurSigned(transfers)}</b> (não contam para a média por jornada).</p>
+      )}
+
+      <Card>
+        <CardTitle>Movimentos por jornada</CardTitle>
+        <div className="divide-y divide-line/60">
+          {groups.map((g, gi) => (
+            <details key={g.key} open={gi === 0} className="group py-1">
+              <summary className="flex cursor-pointer list-none items-center gap-3 rounded-lg px-1 py-2 hover:bg-surface-2/50 [&::-webkit-details-marker]:hidden">
+                <span className="w-24 shrink-0 font-display text-sm font-bold">{g.round ? `Jornada ${g.round}` : "Início"}</span>
+                <span className="flex-1 truncate text-xs text-muted">{g.rows.map((l) => label(l.event_type)).join(" · ")}</span>
+                <span className={cn("font-display font-extrabold tabular", g.net < 0 ? "text-danger" : "text-up")}>{g.round ? eurSigned(g.net) : eur(g.rows[0].balance_after_cents)}</span>
+                <span className="text-faint transition group-open:rotate-90">›</span>
+              </summary>
+              <ul className="mb-2 ml-1 space-y-1 border-l border-line pl-4 text-sm">
+                {g.rows.map((l) => (
+                  <li key={l.id} className="flex items-baseline justify-between gap-3">
+                    <span className="text-muted">{label(l.event_type)}</span>
+                    <span className={cn("tabular", Number(l.amount_cents) < 0 ? "text-danger" : "text-ink")}>{l.event_type === "initial_balance" ? eur(l.amount_cents) : eurSigned(l.amount_cents, false)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
+        {ledger.length >= 100 && <p className="mt-2 text-xs text-faint">A mostrar os 100 movimentos mais recentes.</p>}
+      </Card>
+      <p className="text-xs text-faint">Valores fictícios, definidos pelas regras do jogo. Cada movimento só é aplicado uma vez.</p>
     </div>
   );
 }

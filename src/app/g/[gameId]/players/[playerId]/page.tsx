@@ -3,6 +3,7 @@ import { TRAIT_INFO, traitOf } from "@/engine/narrative/traits";
 import Link from "next/link";
 import { CircleCheck, FileSignature, History, LineChart, Tag } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
+import { ClubLink } from "@/components/club-link";
 import { Crest } from "@/components/crest";
 import { Reveal } from "@/components/fx/motion";
 import { Badge, Card, CardTitle, Field, FormArrow, Meter, OvrBadge, POS_LABEL, PosPill, Stat, cn, eur, inputCls } from "@/components/ui";
@@ -53,8 +54,12 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
                 </div>
                 <h2 className="headline mt-2 text-4xl sm:text-5xl">{p.name_snapshot}</h2>
                 <p className="mt-2 flex items-center justify-center gap-2 text-sm text-muted sm:justify-start">
-                  {p.club_id && <Crest id={p.club_id} name={p.club_name ?? ""} short={p.club_short} color={p.club_color} color2={p.club_color2} size={20} />}
-                  {p.club_name ?? "Sem clube"} · {p.age ? `${p.age} anos` : "idade não verificada"}
+                  {p.club_id ? (
+                    <ClubLink gameId={gameId} clubId={p.club_id} className="flex items-center gap-2">
+                      <Crest id={p.club_id} name={p.club_name ?? ""} short={p.club_short} color={p.club_color} color2={p.club_color2} size={20} />
+                      {p.club_name}
+                    </ClubLink>
+                  ) : "Sem clube"} · {p.age ? `${p.age} anos` : "idade não verificada"}
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                   <Badge tone="info">Potencial {p.potential_band}</Badge>

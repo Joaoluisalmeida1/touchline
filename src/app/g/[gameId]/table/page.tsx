@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ListOrdered } from "lucide-react";
+import { ClubLink } from "@/components/club-link";
 import { Crest } from "@/components/crest";
 import { Card, Empty, FormStrip, cn } from "@/components/ui";
 import { requireUser } from "@/server/auth";
@@ -22,13 +23,14 @@ export default async function TablePage({ params, searchParams }: { params: Prom
     <div className="space-y-5">
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
         {top.map((r, i) => (
-          <div key={r.club_id} className={cn("surface relative overflow-hidden rounded-[var(--radius-card)] p-3 text-center sm:p-5", i === 0 && "border-accent/40")}>
+          <Link key={r.club_id} href={`/g/${gameId}/clubs/${r.club_id}`} prefetch={false}
+            className={cn("surface relative overflow-hidden rounded-[var(--radius-card)] p-3 text-center transition hover:border-line-strong sm:p-5", i === 0 && "border-accent/40")}>
             <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 mx-auto size-40 rounded-full opacity-25 blur-2xl" style={{ background: r.primary_color }} />
             <p className={cn("relative font-display text-sm font-extrabold uppercase", i === 0 ? "text-accent" : "text-faint")}>{i + 1}º</p>
             <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} size={44} className="relative mx-auto mt-1" />
             <p className="relative mt-2 truncate text-xs font-bold sm:text-sm">{r.name_snapshot}</p>
             <p className="relative font-display text-2xl font-extrabold leading-tight tabular sm:text-3xl">{r.points}<span className="ml-1 text-[10px] font-bold uppercase text-faint">pontos</span></p>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -58,13 +60,13 @@ export default async function TablePage({ params, searchParams }: { params: Prom
                         <span className={cn("font-display text-lg font-bold tabular", i === 0 ? "text-accent" : "text-muted")}>{i + 1}</span>
                       </td>
                       <td className="py-2.5">
-                        <span className="flex items-center gap-2.5">
+                        <ClubLink gameId={gameId} clubId={r.club_id} className="flex items-center gap-2.5">
                           <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} size={26} />
                           <span className="min-w-0">
                             <span className={cn("block truncate", mine ? "font-bold" : "font-semibold")}>{r.name_snapshot}</span>
                             <span className="block text-[11px] text-faint">{r.manager_name ?? "IA"}</span>
                           </span>
-                        </span>
+                        </ClubLink>
                       </td>
                       {[r.played, r.won, r.drawn, r.lost, r.gf, r.ga, r.gd > 0 ? `+${r.gd}` : r.gd].map((v, k) => (
                         <td key={k} className={cn("py-2.5 text-center tabular", k > 0 && k < 6 && "hidden sm:table-cell", k === 6 ? (r.gd > 0 ? "text-accent" : r.gd < 0 ? "text-danger" : "text-muted") : "text-muted")}>{v}</td>

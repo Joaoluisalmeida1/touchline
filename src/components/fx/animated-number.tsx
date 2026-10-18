@@ -10,10 +10,10 @@ function fmt(v: number, f: NumberFormat): string {
     case "dec2": return v.toFixed(2);
     case "signed": { const r = Math.round(v); return r > 0 ? `+${r}` : String(r); }
     case "pct": return `${Math.round(v)}%`;
-    case "eurFull": return `€${Math.round(v / 100).toLocaleString("pt-PT")}`;
+    case "eurFull": return `${Math.round(v / 100) < 0 ? "−" : ""}€${Math.abs(Math.round(v / 100)).toLocaleString("pt-PT")}`;
     case "eur": {
-      const e = v / 100, a = Math.abs(e);
-      return `€${a >= 1e6 ? `${(e / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M` : a >= 1e3 ? `${Math.round(e / 1e3)}k` : Math.round(e)}`;
+      const e = v / 100, a = Math.abs(e), sign = Math.round(e) < 0 ? "−" : "";
+      return `${sign}€${a >= 1e6 ? `${(a / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M` : a >= 1e3 ? `${Math.round(a / 1e3)}k` : Math.round(a)}`;
     }
     default: return String(Math.round(v));
   }

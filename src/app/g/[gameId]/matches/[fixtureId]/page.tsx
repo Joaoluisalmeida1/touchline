@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Activity, BarChart3, Star, Swords } from "lucide-react";
+import { ClubLink } from "@/components/club-link";
 import { Crest } from "@/components/crest";
 import { Bar } from "@/components/fx/motion";
 import { MatchAnalysis } from "@/components/match-analysis";
@@ -51,8 +52,8 @@ export default async function MatchPage({ params }: { params: Promise<{ gameId: 
         <Card>
           <CardTitle icon={<BarChart3 />}>Estatísticas</CardTitle>
           <div className="mb-3 flex items-center justify-between">
-            <Crest id={f.home_club_id} name={f.home_name} short={f.home_short} color={f.home_color} color2={f.home_color2} size={26} />
-            <Crest id={f.away_club_id} name={f.away_name} short={f.away_short} color={f.away_color} color2={f.away_color2} size={26} />
+            <ClubLink gameId={gameId} clubId={f.home_club_id} label={f.home_name}><Crest id={f.home_club_id} name={f.home_name} short={f.home_short} color={f.home_color} color2={f.home_color2} size={26} /></ClubLink>
+            <ClubLink gameId={gameId} clubId={f.away_club_id} label={f.away_name}><Crest id={f.away_club_id} name={f.away_name} short={f.away_short} color={f.away_color} color2={f.away_color2} size={26} /></ClubLink>
           </div>
           <ul className="space-y-3.5 text-sm">
             {STAT_ROWS.map(([k, label, fmt], i) => {

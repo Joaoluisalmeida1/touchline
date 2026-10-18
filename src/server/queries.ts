@@ -97,6 +97,27 @@ export async function getRecentRatings(userId: string, clubId: string, n = 5) {
   });
 }
 
+/** Public club page: the club (member-readable fields only) and its fixtures this season. Null if not in this league. */
+export async function getClubProfile(userId: string, gameId: string, clubId: string) {
+  return withUser(userId, async (c) => {
+    const club = await c.query<{ id: string; name_snapshot: string; short_name: string; primary_color: string; secondary_color: string; reputation: number;
+      strength: string; manager_user_id: string | null; manager_name: string | null }>(
+      `select gc.id, gc.name_snapshot, gc.short_name, gc.primary_color, gc.secondary_color, gc.reputation, gc.strength, gc.manager_user_id,
+              pr.display_name as manager_name
+         from game_clubs gc left join profiles pr on pr.id = gc.manager_user_id
+        where gc.id = $1 and gc.game_id = $2`, [clubId, gameId]);
+    if (!club.rowCount) return null;
+    const fixtures = await c.query(
+      `select f.id, f.round_number, f.status, f.result_home, f.result_away, f.kickoff_at, f.home_club_id, f.away_club_id,
+              h.name_snapshot as home_name, h.short_name as home_short, h.primary_color as home_color, h.secondary_color as home_color2,
+              a.name_snapshot as away_name, a.short_name as away_short, a.primary_color as away_color, a.secondary_color as away_color2
+         from fixtures f join games g on g.id = f.game_id join seasons se on se.id = f.season_id and se.number = g.current_season
+         join game_clubs h on h.id = f.home_club_id join game_clubs a on a.id = f.away_club_id
+        where f.game_id = $1 and $2 in (f.home_club_id, f.away_club_id) order by f.round_number`, [gameId, clubId]);
+    return { club: club.rows[0], fixtures: fixtures.rows };
+  });
+}
+
 export const getClubColors = cache(async (userId: string, clubId: string) => {
   return withUser(userId, async (c) => (await c.query<{ name_snapshot: string; short_name: string; primary_color: string; secondary_color: string }>(
     `select name_snapshot, short_name, primary_color, secondary_color from game_clubs where id = $1`, [clubId])).rows[0] ?? null);
@@ -291,6 +312,22 @@ export async function getRecentTransfers(userId: string, gameId: string) {
        from transfer_transactions t join game_players p on p.id = t.player_id
        left join game_clubs fc on fc.id = t.from_club_id left join game_clubs tc on tc.id = t.to_club_id
       where t.game_id = $1 order by t.completed_at desc limit 20`, [gameId])).rows);
+}
+
+/** Money in/out per matchday this season, and the balance the season started with (finances chart). */
+export async function getRoundFlows(userId: string, clubId: string, season: number) {
+  return withUser(userId, async (c) => {
+    const rounds = await c.query<{ round: number; income: string; expenses: string }>(
+      `select coalesce(round_number, 0) as round,
+              coalesce(sum(amount_cents) filter (where amount_cents > 0), 0)::bigint as income,
+              coalesce(sum(amount_cents) filter (where amount_cents < 0), 0)::bigint as expenses
+         from club_ledger where club_id = $1 and season_number = $2 and event_type <> 'initial_balance'
+        group by 1 order by 1`, [clubId, season]);
+    const start = await c.query<{ start: string }>(
+      `select (balance_after_cents - case when event_type = 'initial_balance' then 0 else amount_cents end)::bigint as start
+         from club_ledger where club_id = $1 and season_number = $2 order by id limit 1`, [clubId, season]);
+    return { rounds: rounds.rows.map((r) => ({ round: r.round, income: Number(r.income), expenses: Number(r.expenses) })), seasonStart: start.rows[0] ? Number(start.rows[0].start) : null };
+  });
 }
 
 export async function getFinances(userId: string, clubId: string) {
