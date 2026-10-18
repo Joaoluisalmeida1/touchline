@@ -77,7 +77,7 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 
 ## Roleta, duelos e apostas — o que existe
 
-- **Roleta da Liga** (`/g/[id]/slots`, slots-v1, Hoje › Roleta): cada giro custa **€500 000**, até **5 giros por dia** por treinador (dia na timezone da liga). Máquina com luzes, três rolos, som (Web Audio, com botão de silêncio), vibração e confetes; o resultado é sempre decidido no servidor (aleatoriedade criptográfica, não previsível pelo código aberto). Probabilidades públicas na página:
+- **Roleta da Liga** (`/g/[id]/slots`, slots-v1, Hoje › Roleta): cada giro custa **€500 000**, **sem limite diário** (só o dinheiro disponível trava). Máquina com luzes, três rolos, som (Web Audio, com botão de silêncio), vibração e confetes; o resultado é sempre decidido no servidor (aleatoriedade criptográfica, não previsível pelo código aberto). Probabilidades públicas na página:
   - **Comum (~43%)**: €100–400k, +6 moral a 3 jogadores, +8% condição ao plantel.
   - **Raro (~22%)**: €1–2,5M, giro grátis, carta Escudo, emblema raro.
   - **Épico (~11%)**: carta Imunidade a lesões, carta Bilheteira ×2, emblema épico, **jogador** (de clubes fora da liga e fora da Lista; peso ∝ valor^−0,8 — os caros são raros mas qualquer um pode sair; plantel cheio → metade do valor em dinheiro).

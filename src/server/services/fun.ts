@@ -8,7 +8,7 @@ import type { Pool, PoolClient } from "pg";
 import { initialContractEnd, weeklyWageCents } from "../../engine/economy/economy";
 import { BETTING_VERSION, MIN_STAKE_CENTS, odds as oddsFor, outcome, payout } from "../../engine/betting/odds";
 import {
-  DAILY_SPINS, DUEL_STAKE_CENTS, JACKPOT_BASE_CENTS, JACKPOT_SHARE, PRIZE_LABEL, SKIN_LABEL, SLOTS_VERSION, SPIN_COST_CENTS,
+  DUEL_STAKE_CENTS, JACKPOT_BASE_CENTS, JACKPOT_SHARE, PRIZE_LABEL, SKIN_LABEL, SLOTS_VERSION, SPIN_COST_CENTS,
   PRIZES, cashAmount, drawPrize, duelReels, pickPrizePlayer, reelsFor, skinFor, type PrizeKind, type Rarity, type Symbol,
 } from "../../engine/slots/slots";
 import { asService } from "../pg";
@@ -57,7 +57,7 @@ const available = (x: Ctx) => Number(x.cash) - Number(x.reserved);
 export interface SpinOutcome {
   id: string; prize: PrizeKind; rarity: Rarity; label: string; detail: string; reels: Symbol[]; free: boolean;
   amount_cents?: number; skin?: string; player?: { id: string; name: string; ovr: number; position_group: string } | null;
-  shielded?: boolean; pot_cents: number; spins_left: number;
+  shielded?: boolean; pot_cents: number; spins_today: number;
 }
 
 /** `opts.prize` forces the outcome (integration tests only; the server action never passes it). */
@@ -71,7 +71,6 @@ export async function spin(pool: Pool, userId: string, gameId: string, opts: { p
       [x.club_id, x.timezone])).rows[0];
     const freeCard = (await c.query<{ id: string }>(`select id from public.slot_cards where club_id = $1 and kind = 'free_spin' and status = 'held' order by created_at limit 1 for update`, [x.club_id])).rows[0];
     const free = !!freeCard;
-    if (!free && today.n >= DAILY_SPINS) await bad(c, "daily_limit", `Já fizeste os ${DAILY_SPINS} giros de hoje. Volta amanhã!`);
     if (!free && available(x) < SPIN_COST_CENTS) await bad(c, "insufficient_funds", "Precisas de €500 000 disponíveis para girar.");
 
     await c.query(`insert into public.slots_pots (game_id) values ($1) on conflict do nothing`, [gameId]);
@@ -90,7 +89,7 @@ export async function spin(pool: Pool, userId: string, gameId: string, opts: { p
     const forced = opts.prize ? PRIZES.find((p) => p.kind === opts.prize) : undefined;
     const prize = forced ?? drawPrize(rand(), { negatives, pointPenalty });
     const reels = reelsFor(prize, rand);
-    const out: SpinOutcome = { id: spinId, prize: prize.kind, rarity: prize.rarity, label: PRIZE_LABEL[prize.kind], detail: "", reels, free, pot_cents: pot, spins_left: 0 };
+    const out: SpinOutcome = { id: spinId, prize: prize.kind, rarity: prize.rarity, label: PRIZE_LABEL[prize.kind], detail: "", reels, free, pot_cents: pot, spins_today: 0 };
     const ledger = (amount: number, tag: string) => c.query(`select public._ledger($1, $2, 'slots', $3, $4, $5, $6, $7)`,
       [gameId, x.club_id, amount, spinId, `spin:${spinId}:${tag}`, x.season, x.round]);
 
@@ -176,7 +175,7 @@ export async function spin(pool: Pool, userId: string, gameId: string, opts: { p
         const kind = prize.kind === "free_spin" ? "free_spin" : prize.kind.replace("card_", "");
         await c.query(`insert into public.slot_cards (game_id, club_id, kind, spin_id) values ($1, $2, $3, null)`, [gameId, x.club_id, kind]);
         out.detail = { shield: "Guarda-a: anula o próximo azar da roleta.", immunity: "Ativa-a antes de uma jornada: as lesões dessa jornada não contam.",
-          gate: "Ativa-a antes de um jogo em casa: a bilheteira dessa jornada vem a dobrar.", free_spin: "O próximo giro é grátis e não conta para o limite diário." }[kind]!;
+          gate: "Ativa-a antes de um jogo em casa: a bilheteira dessa jornada vem a dobrar.", free_spin: "O próximo giro é grátis." }[kind]!;
         break;
       }
       case "jackpot": {
@@ -233,7 +232,7 @@ export async function spin(pool: Pool, userId: string, gameId: string, opts: { p
       await c.query(`insert into public.wall_posts (game_id, kind, payload, dedupe_key) values ($1, 'slots', $2, $3) on conflict do nothing`,
         [gameId, JSON.stringify({ club: x.club_name, label: out.label, detail: out.detail, rarity: prize.rarity }), `spin:${spinId}`]);
     }
-    out.spins_left = Math.max(0, DAILY_SPINS - today.n - (free ? 0 : 1));
+    out.spins_today = today.n + (free ? 0 : 1);
     return out;
   });
 }
@@ -347,4 +346,4 @@ export async function applyCards(pool: Pool, gameId: string, season: number, rou
   });
 }
 
-export { DAILY_SPINS, DUEL_STAKE_CENTS, SPIN_COST_CENTS };
+export { DUEL_STAKE_CENTS, SPIN_COST_CENTS };

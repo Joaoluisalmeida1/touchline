@@ -111,7 +111,7 @@ Plano completo em `docs/game-design.md`. Decisões tomadas com o Joao (2026-10-1
 
 ### Roleta e apostas (2026-10-18)
 
-- **€500k por giro, 5 por dia** (pedido do Joao: custo por giro; o limite diário protege a economia entre amigos). Valor esperado em dinheiro < custo: a roleta é um sumidouro de dinheiro com diversão por cima; os jogadores e emblemas são o que dá vontade de voltar.
+- **€500k por giro, sem limite diário** (pedido do Joao: custo por giro; o limite de 5/dia foi retirado a 18/10/2026 — "YOLO"; o custo e o saldo disponível são o único travão). Valor esperado em dinheiro < custo: a roleta é um sumidouro de dinheiro com diversão por cima; os jogadores e emblemas são o que dá vontade de voltar.
 - **Aleatoriedade criptográfica** em vez do RNG determinístico do motor: o repositório é aberto e um giro previsível estragava o jogo. Cada giro fica registado (`slot_spins`) com o resultado.
 - **Probabilidades públicas** na página e **sem "quase-ganhou" fabricado**: os rolos mostram exatamente o prémio sorteado.
 - **−1 ponto desligado por omissão** e azares desligáveis pelo dono (podem estragar uma liga). A restrição `standings.points >= 0` passou a `>= -50`.
