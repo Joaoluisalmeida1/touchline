@@ -49,6 +49,7 @@ Com Supabase real: ver [`docs/deployment.md`](docs/deployment.md). Importar liga
 | `npm run sim:seasons -- 10` | balanço de progressão e economia |
 | `npm run playerelo:*` | pipeline de importação (ver operator guide) |
 | `npm run seed:synthetic` | catálogo + snapshot fictícios |
+| `npm run wikidata:colours -- --leagues all` | cores reais dos clubes (Wikidata/Wikipedia); `--apply` para gravar (ver operator guide) |
 
 ## Documentação
 

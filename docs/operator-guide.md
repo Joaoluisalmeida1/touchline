@@ -89,6 +89,24 @@ npm run wikidata:ages -- --leagues all --apply             # escreve só onde a 
 
 Escreve em `source_players`, `dataset_snapshot_players` e nas ligas já criadas (`game_players.age`, `age_known`). Correspondência única por nome dentro do plantel do clube no Wikidata; ambíguos, sem data ao dia ou idades fora de 15–45 ficam por preencher. Volta a correr sem problema (idempotente).
 
+## Cores reais dos clubes (Wikidata + Wikipedia)
+
+Sem isto, cada clube recebe uma cor da paleta por *hash* do id (não corresponde à cor real). Corre no teu computador, nunca em produção.
+
+```bash
+npm run wikidata:colours -- --leagues all                          # ensaio: tabela por liga, não escreve
+npm run wikidata:colours -- --leagues all --apply                  # grava no catálogo → ligas novas já usam as cores
+npm run wikidata:colours -- --leagues all --apply --update-games   # + recolore as ligas já criadas (game_clubs)
+```
+
+- **Liga → Wikidata:** pesquisa pelo nome e exige o mesmo país (Inglaterra/Escócia = Reino Unido). Se aparecer "✗ … pass --league-qid", ver a lista de candidatos e repetir com `--league-qid <id externo>=Q…` (ex.: `--league-qid 71=Q206813`).
+- **Clube → item:** só dentro dos clubes da liga no Wikidata (`P118`), por nome (ignora "FC", "SL", pontos, acentos); fallback por pesquisa só no mesmo país. Ambíguos ficam com a cor atual; corrigir com `--club-qid <uuid do clube>=Q…`.
+- **Cores**, por ordem de confiança: Wikidata "official color" (`P6364`, pela ordem do item; cores web puras → tons de equipamento) → equipamento da caixa de informação da Wikipedia (inglês) → equipas B/sub-23 herdam do clube principal.
+- Proveniência em `source_clubs.metadata_json.colors_source` (`provider`, `qid`, `fetched_at`). Para fixar cores à mão: `colors_source.provider = "manual"` — o script nunca as sobrepõe (salvo `--force`).
+- Respostas em cache 7 dias em `data/wikidata-cache` (`--refresh` ignora a cache); ~4 pedidos por liga + 1 por clube que precise do fallback, ≥1,1 s entre pedidos. Idempotente.
+
+Ensaio com 6 ligas reais (47 clubes, 2026-10-18): 47/47 correspondências corretas, 45 com cores (30 Wikidata, 14 Wikipedia); sem dados: São Paulo, Borussia Mönchengladbach.
+
 ## Operação de ligas
 
 - Processar jornada: botão do criador (idempotente). Para várias ligas em modo diário: cron da Vercel ou `curl -H "Authorization: Bearer $CRON_SECRET" $APP_BASE_URL/api/cron/process`.

@@ -22,6 +22,7 @@
     "playerelo:audit": "tsx scripts/playerelo/audit.ts",
     "playerelo:finalize": "tsx scripts/playerelo/finalize.ts",
     "wikidata:ages": "tsx scripts/wikidata/ages.ts",
+    "wikidata:colours": "tsx scripts/wikidata/colours.ts",
     "sim:quick": "tsx scripts/sim-calibration/quick.ts",
     "sim:calibrate": "tsx scripts/sim-calibration/calibrate.ts",
     "sim:seasons": "tsx scripts/sim-calibration/seasons.ts",

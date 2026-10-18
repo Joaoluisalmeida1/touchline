@@ -6,6 +6,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { hashUnit } from "../../engine/common/rng";
 import { initialCashCents, initialContractEnd, weeklyWageCents } from "../../engine/economy/economy";
+import { toHex } from "../../integrations/wikidata/colours";
 import { asService, asUser } from "../pg";
 
 export const CreateGameInput = z.object({
@@ -72,8 +73,9 @@ export async function createGame(pool: Pool, userId: string, raw: CreateGameInpu
     });
     const clubRows = clubs.rows.map((cl) => ({
       source_club_id: cl.source_club_id, name: cl.name, short_name: (cl.short_name ?? cl.name.slice(0, 3)).toUpperCase(),
-      primary_color: (cl.meta?.primary_color as string) ?? PALETTE[Math.floor(hashUnit(cl.source_club_id) * PALETTE.length)],
-      secondary_color: "#f8fafc", reputation: cl.reputation, strength: Number(cl.strength),
+      // real colours from the catalog (scripts/wikidata/colours.ts) when known, else a stable palette colour
+      primary_color: toHex(cl.meta?.primary_color as string) ?? PALETTE[Math.floor(hashUnit(cl.source_club_id) * PALETTE.length)],
+      secondary_color: toHex(cl.meta?.secondary_color as string) ?? "#f8fafc", reputation: cl.reputation, strength: Number(cl.strength),
       cash_cents: initialCashCents(squadValue.get(cl.source_club_id) ?? 0, cl.reputation),
     }));
     return {
