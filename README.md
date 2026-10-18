@@ -55,8 +55,7 @@ Com Supabase real: ver [`docs/deployment.md`](docs/deployment.md). Importar liga
 - [Arquitetura](docs/architecture.md) · [Decisões e defaults](docs/decisions.md)
 - [Contrato de dados PlayerElo](docs/data-contract.md) · [Licenciamento](docs/data-licensing.md)
 - [Balanceamento do jogo](docs/game-balance.md) · [Custos](docs/costs.md)
-- [Deploy](docs/deployment.md) · [Guia do operador](docs/operator-guide.md)
-- **[Segurança (SECURITY.md)](SECURITY.md)** — como reportar vulnerabilidades, controlos, riscos aceites, checklist de configurações
+- [Deploy](docs/deployment.md) · [Guia do operador](docs/operator-guide.md) · [Runbook (incidentes, backups, cron)](docs/runbook.md)
 - **[Regras de PR (CONTRIBUTING.md)](CONTRIBUTING.md)** — nível de risco, plano de rollback obrigatório em migrations, métricas em PRs de desempenho
 
 ## Princípios
