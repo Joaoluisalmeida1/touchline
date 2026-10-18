@@ -73,8 +73,32 @@ export function PlayerAvatar({ id, primary, secondary, size = 40, className, tit
   );
 }
 
-export function ClubBadge({ seed, name, short, primary, secondary, size = 36, className }: {
-  seed: string; name: string; short: string; primary: string; secondary: string; size?: number; className?: string;
+/** Crest skins won in the Roleta (original SVG overlays; "chama"/"relampago" are animated). */
+function SkinOverlay({ skin, clip }: { skin: string; clip: string }) {
+  switch (skin) {
+    case "riscas": return <g clipPath={`url(#${clip})`} opacity=".35">{[8, 16, 24, 32, 40, 48, 56].map((x) => <rect key={x} x={x} width="2.5" height="64" fill="#fff" />)}</g>;
+    case "aros": return <g clipPath={`url(#${clip})`} opacity=".35">{[14, 26, 38, 50].map((y) => <rect key={y} y={y} width="64" height="5" fill="#fff" />)}</g>;
+    case "faixa": return <g clipPath={`url(#${clip})`}><path d="M-6 18 L20 -6 L70 44 L44 70 Z" fill="#000" opacity=".28" /></g>;
+    case "xadrez": return <g clipPath={`url(#${clip})`} opacity=".22">{Array.from({ length: 64 }, (_, i) => ((i + Math.floor(i / 8)) % 2 ? <rect key={i} x={(i % 8) * 8} y={Math.floor(i / 8) * 8} width="8" height="8" fill="#fff" /> : null))}</g>;
+    case "estrela": return <path d="M32 -1 l3 6.5 7 .8-5.2 4.8 1.4 7-6.2-3.5-6.2 3.5 1.4-7-5.2-4.8 7-.8z" fill="#ffcc33" stroke="#7a5200" strokeWidth="1" transform="translate(0 2) scale(1)" />;
+    case "ouro": return <><path d="M32 3 L58 11 C58 34 50 52 32 61 C14 52 6 34 6 11 Z" fill="none" stroke="#ffcc33" strokeWidth="5" /><path d="M14 14 L30 9" stroke="#fff6c8" strokeWidth="3" strokeLinecap="round" opacity=".8" /></>;
+    case "carbono": return <g clipPath={`url(#${clip})`} opacity=".35">{Array.from({ length: 16 }, (_, i) => <path key={i} d={`M${i * 4 - 32} 64 L${i * 4 + 32} 0`} stroke="#000" strokeWidth="1.6" />)}</g>;
+    case "vitral": return <g clipPath={`url(#${clip})`} opacity=".4"><path d="M0 0 L32 32 L0 64Z" fill="#e11d2e" /><path d="M64 0 L32 32 L64 64Z" fill="#3a5bf0" /><path d="M0 0 L64 0 L32 32Z" fill="#ffcc33" /><path d="M0 64 L64 64 L32 32Z" fill="#2fbf6a" /></g>;
+    case "chama": return (
+      <g clipPath={`url(#${clip})`}>
+        <g style={{ transformOrigin: "32px 60px", animation: "tl-flame .8s ease-in-out infinite" }}>
+          <path d="M8 64 C10 50 18 52 16 40 C24 48 22 54 28 46 C30 36 36 40 34 30 C44 40 40 50 46 44 C48 52 56 50 58 64 Z" fill="#ff7a1a" opacity=".85" />
+          <path d="M16 64 C18 56 24 56 24 50 C30 56 30 58 34 52 C38 58 44 56 48 64 Z" fill="#ffcc33" opacity=".9" />
+        </g>
+      </g>
+    );
+    case "relampago": return <path d="M36 4 L20 34 H31 L26 60 L46 26 H34 Z" fill="#fff6a8" stroke="#ffcc33" strokeWidth="1.5" style={{ animation: "tl-flash 2.4s linear infinite" }} />;
+    default: return null;
+  }
+}
+
+export function ClubBadge({ seed, name, short, primary, secondary, size = 36, className, skin }: {
+  seed: string; name: string; short: string; primary: string; secondary: string; size?: number; className?: string; skin?: string | null;
 }) {
   const h = hash(seed);
   const pattern = h % 4; // 0 plain, 1 stripes, 2 sash, 3 chevron
@@ -90,10 +114,13 @@ export function ClubBadge({ seed, name, short, primary, secondary, size = 36, cl
         {pattern === 2 && <path d="M-4 52 L52 -4 L68 8 L8 68 Z" fill={secondary} opacity=".9" />}
         {pattern === 3 && <path d="M0 26 L32 44 L64 26 L64 36 L32 54 L0 36 Z" fill={secondary} opacity=".9" />}
       </g>
+      {skin && skin !== "estrela" && skin !== "ouro" && skin !== "relampago" && <SkinOverlay skin={skin} clip={id} />}
       <path d={shield} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth="2" />
+      {skin && (skin === "estrela" || skin === "ouro") && <SkinOverlay skin={skin} clip={id} />}
       <text x="32" y="33" textAnchor="middle" dominantBaseline="middle" fontSize={short.length > 3 ? 13 : 16} fontWeight="900"
         fill={pattern === 0 ? ink : "#fff"} stroke={pattern === 0 ? "none" : "rgba(0,0,0,.45)"} strokeWidth=".8" paintOrder="stroke"
         style={{ letterSpacing: "0.5px", fontFamily: "inherit" }}>{short.slice(0, 4).toUpperCase()}</text>
+      {skin === "relampago" && <SkinOverlay skin={skin} clip={id} />}
     </svg>
   );
 }

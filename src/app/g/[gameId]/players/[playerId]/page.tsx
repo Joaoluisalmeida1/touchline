@@ -39,7 +39,7 @@ export default async function PlayerPage({ params, searchParams }: { params: Pro
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
       {toast === "signed" && mine && (
         <p role="status" className="flex items-center gap-2 rounded-2xl border border-accent/40 bg-accent/10 p-3 text-sm font-semibold text-accent lg:col-span-2">
-          <CircleCheck className="size-4" />Proposta aceite! {p.name_snapshot} já é jogador do teu clube.
+          <CircleCheck className="size-4" />Contratado! {p.name_snapshot} já é jogador do teu clube.
         </p>
       )}
       <div className="min-w-0 space-y-5">

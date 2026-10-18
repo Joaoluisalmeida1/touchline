@@ -75,6 +75,22 @@ Página **Clube** (`/g/[id]/club`: Direção · Patrocínios · Estádio · Staf
 - **Clubes da IA não respondem a propostas**: só vendem pela lista. Entre treinadores humanos mantêm-se as negociações (propostas, contrapropostas, trocas, notas). Ligas antigas podem voltar ao mercado clássico com `settings_json.market = 'classic'`.
 - Tudo corre no servidor numa "ronda de mercado" por (época, jornada), idempotente (marcador `market_tick`), depois de cada jornada e na primeira visita ao mercado.
 
+## Roleta, duelos e apostas — o que existe
+
+- **Roleta da Liga** (`/g/[id]/slots`, slots-v1, Hoje › Roleta): cada giro custa **€500 000**, até **5 giros por dia** por treinador (dia na timezone da liga). Máquina com luzes, três rolos, som (Web Audio, com botão de silêncio), vibração e confetes; o resultado é sempre decidido no servidor (aleatoriedade criptográfica, não previsível pelo código aberto). Probabilidades públicas na página:
+  - **Comum (~43%)**: €100–400k, +6 moral a 3 jogadores, +8% condição ao plantel.
+  - **Raro (~22%)**: €1–2,5M, giro grátis, carta Escudo, emblema raro.
+  - **Épico (~11%)**: carta Imunidade a lesões, carta Bilheteira ×2, emblema épico, **jogador** (de clubes fora da liga e fora da Lista; peso ∝ valor^−0,8 — os caros são raros mas qualquer um pode sair; plantel cheio → metade do valor em dinheiro).
+  - **Lendário (~1,6%)**: €5–10M, emblema animado, **JACKPOT** (pote da liga: €2M + 20% de cada giro + todas as multas).
+  - **Azar (~22%)**: lesão no treino (1–3 jornadas), multa €300k–€1M (vai para o jackpot), jogador amuado (−12 moral). **Desastre (0,5%)**: −1 ponto na classificação.
+  - O dono da liga pode desligar os azares e decide o −1 ponto (desligado por omissão → sai uma multa). O Escudo anula o próximo azar.
+- **Cartas guardáveis**: Escudo (automático), Imunidade (ativa-se para a próxima jornada: as lesões dessa jornada não contam), Bilheteira ×2 (a receita de bilheteira dessa jornada em casa vem a dobrar), Giro grátis (não conta para o limite).
+- **Emblemas**: riscas, aros, estrela, faixa, xadrez (raros), ouro, carbono, vitral (épicos), chama e relâmpago (animados, lendários). Coleção na Roleta; o emblema escolhido aparece no cabeçalho, na tabela e nas apostas. Repetido → €250k.
+- **Duelos**: desafias outro treinador; €500 000 ficam reservados; ao aceitar, os dois giram (pontos por símbolo, pares +5, trio ×2) e quem fizer mais leva €500 000 do outro; empate = ninguém paga. No "Por decidir" e no mural.
+- **Mural**: épicos, lendários, desastres, jackpots, duelos e apostas grandes são publicados automaticamente.
+- **Apostas** (`/g/[id]/bets`, betting-v1, Jogo › Apostas): odds 1X2 para todos os jogos da próxima jornada, pela força das equipas e o fator casa (margem 7%). Cada treinador aposta o que quiser (mínimo €10 000, até ao dinheiro disponível) em qualquer jogo **menos o seu**. A aposta sai logo da conta; o prémio (aposta × odd) entra depois da jornada. Tabela dos apostadores por lucro. O dono pode desligar as apostas.
+- Tudo com dinheiro do jogo — não há forma de comprar giros ou fichas com dinheiro real.
+
 ## Próximas fases — regras de desenho já acordadas
 
 - Idades: só reais (Wikidata, CC0) ou desconhecidas; desenvolvimento por idade só com idade real.

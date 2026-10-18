@@ -2,7 +2,7 @@ import "server-only";
 import { withUser } from "./db";
 
 export interface WallPost {
-  id: string; kind: "post" | "transfer" | "achievement" | "headline"; body: string | null; payload: Record<string, unknown>;
+  id: string; kind: "post" | "transfer" | "achievement" | "headline" | "slots" | "duel" | "bet"; body: string | null; payload: Record<string, unknown>;
   created_at: string; author_user_id: string | null; author: string | null;
   reactions: { emoji: string; n: number; mine: boolean }[];
 }

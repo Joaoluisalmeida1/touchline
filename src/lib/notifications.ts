@@ -23,6 +23,10 @@ export function notificationText(type: string, p: Record<string, unknown>): stri
     case "board_warning": return `Aviso da direção: a confiança caiu para ${p.confidence}.`;
     case "board_ultimatum": return `Ultimato da direção (confiança ${p.confidence}): orçamento de transferências cortado.`;
     case "board_praise": return `A direção está satisfeita (confiança ${p.confidence}): orçamento de transferências reforçado.`;
+    case "duel_challenge": return `${p.club} desafia-te para um duelo na roleta (€500 000).`;
+    case "duel_result": return p.won ? `Ganhaste o duelo contra ${p.opponent}: +${eur(p.amount_cents)}.` : p.draw ? `Empate no duelo com ${p.opponent}.` : `Perdeste o duelo contra ${p.opponent}.`;
+    case "bet_won": return `Aposta ganha: ${p.match} — recebeste ${eur(p.payout_cents)}.`;
+    case "jackpot": return `${p.club} ganhou o JACKPOT da liga: ${eur(p.amount_cents)}!`;
     default: return type;
   }
 }

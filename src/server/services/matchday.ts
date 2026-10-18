@@ -21,6 +21,7 @@ import { afterRoundSocial } from "./social";
 import { ensureCup, playDueCupRounds } from "./cup";
 import { academyAfterRound, aiSignFreeAgents, ensureContractTalks, seasonEndCareer } from "./career";
 import { marketTick } from "./market";
+import { applyCards, settleBets } from "./fun";
 import { absRound, stadiumFrom, type StaffRole, type Upgrade } from "../../engine/economy/business";
 
 export interface MatchdayResult {
@@ -220,6 +221,13 @@ export async function processNextMatchday(pool: Pool, gameId: string, opts: { le
       await afterRoundSocial(pool, gameId, season, round);
     } catch (e) {
       console.error(JSON.stringify({ level: "error", msg: "social.after_round_failed", ...ctx, round, error: (e as Error).message }));
+    }
+    // betting payouts and roleta cards played for this round
+    try {
+      await settleBets(pool, gameId, season, round);
+      await applyCards(pool, gameId, season, round);
+    } catch (e) {
+      console.error(JSON.stringify({ level: "error", msg: "fun.after_round_failed", ...ctx, round, error: (e as Error).message }));
     }
     // Transfer List: prices drop, AI clubs buy managers' listings, new players appear
     try {

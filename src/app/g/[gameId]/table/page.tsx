@@ -25,7 +25,7 @@ export default async function TablePage({ params, searchParams }: { params: Prom
           <div key={r.club_id} className={cn("surface relative overflow-hidden rounded-[var(--radius-card)] p-3 text-center sm:p-5", i === 0 && "border-accent/40")}>
             <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 mx-auto size-40 rounded-full opacity-25 blur-2xl" style={{ background: r.primary_color }} />
             <p className={cn("relative font-display text-sm font-extrabold uppercase", i === 0 ? "text-accent" : "text-faint")}>{i + 1}º</p>
-            <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} size={44} className="relative mx-auto mt-1" />
+            <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} skin={r.crest_skin} size={44} className="relative mx-auto mt-1" />
             <p className="relative mt-2 truncate text-xs font-bold sm:text-sm">{r.name_snapshot}</p>
             <p className="relative font-display text-2xl font-extrabold leading-tight tabular sm:text-3xl">{r.points}<span className="ml-1 text-[10px] font-bold uppercase text-faint">pontos</span></p>
           </div>
@@ -59,7 +59,7 @@ export default async function TablePage({ params, searchParams }: { params: Prom
                       </td>
                       <td className="py-2.5">
                         <span className="flex items-center gap-2.5">
-                          <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} size={26} />
+                          <Crest id={r.club_id} name={r.name_snapshot} short={r.short_name} color={r.primary_color} color2={r.secondary_color} skin={r.crest_skin} size={26} />
                           <span className="min-w-0">
                             <span className={cn("block truncate", mine ? "font-bold" : "font-semibold")}>{r.name_snapshot}</span>
                             <span className="block text-[11px] text-faint">{r.manager_name ?? "IA"}</span>

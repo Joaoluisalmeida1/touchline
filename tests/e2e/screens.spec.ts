@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
  */
 test.setTimeout(720_000);
 
-const ROUTES = ["", "/week", "/squad", "/tactics", "/fixtures", "/market", "/club", "/finances", "/table", "/news", "/cup", "/social", "/history", "/settings"];
+const ROUTES = ["", "/week", "/squad", "/tactics", "/fixtures", "/market", "/club", "/finances", "/table", "/news", "/cup", "/social", "/history", "/settings", "/slots", "/bets"];
 const SIZES = [{ name: "phone", width: 360, height: 780 }, { name: "desktop", width: 1440, height: 900 }] as const;
 
 async function overflow(page: Page) {
@@ -56,7 +56,7 @@ test("every game screen renders in the v2 shell (dark + light, 360 + 1440)", asy
         await page.goto(url);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         await expect(page.getByRole("navigation", { name: /Navegação da liga/ }).first()).toBeAttached();
-        expect.soft(await page.getByText(/Application error|Unhandled Runtime Error/).count(), `${url} shows an error`).toBe(0);
+        expect.soft(await page.getByText(/Application error|Unhandled Runtime Error|Não foi possível carregar/).count(), `${url} shows an error`).toBe(0);
         const o = await overflow(page);
         expect.soft(o.over, `${url} overflows at ${size.width}px (${theme}): ${o.culprits}`).toBeLessThanOrEqual(1);
         const slug = (url.replace(/^.*\/g\/[0-9a-f-]+/, "").replace(/^\//, "").replace(/[^a-z0-9]+/gi, "-") || "home").slice(0, 40);
@@ -64,6 +64,18 @@ test("every game screen renders in the v2 shell (dark + light, 360 + 1440)", asy
       }
     }
   }
+
+  // the roleta spins and shows a result; a bet can be placed on another match of the next round
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${gameUrl}/slots`);
+  await page.getByRole("button", { name: /^Girar/ }).click();
+  await expect(page.locator("[aria-live=polite] p").filter({ hasText: /Comum|Raro|Épico|Lendário|Azar|Desastre/ }).first()).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: "test-results/screens/dark-desktop-slots-result.png" });
+  await page.goto(`${gameUrl}/bets`);
+  const slip = page.getByRole("radiogroup", { name: /Resultado de/ }).filter({ has: page.locator("button:not([disabled])") }).first();
+  await slip.getByRole("radio").first().click();
+  await page.getByRole("button", { name: /^Apostar/ }).first().click();
+  await expect(page.getByText(/Aposta feita a/)).toBeVisible();
 
   // command palette + today drawer
   await page.setViewportSize({ width: 1440, height: 900 });

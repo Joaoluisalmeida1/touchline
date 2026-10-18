@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, Award, Lock, MessagesSquare, Newspaper, Trash2, Trophy, Users } from "lucide-react";
+import { ArrowLeftRight, Award, Dices, Lock, MessagesSquare, Newspaper, Sparkles, Swords, Trash2, Trophy, Users } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { SectionTabs } from "@/components/club/section-tabs";
 import { Crest } from "@/components/crest";
@@ -92,8 +92,14 @@ function PostBody({ p, gameId }: { p: WallPost; gameId: string }) {
       <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">{p.body}</p>
     </div>
   );
-  const icon = p.kind === "transfer" ? <ArrowLeftRight /> : p.kind === "achievement" ? <Award /> : <Newspaper />;
-  const text = p.kind === "transfer"
+  const icon = p.kind === "transfer" ? <ArrowLeftRight /> : p.kind === "achievement" ? <Award /> : p.kind === "slots" ? <Sparkles /> : p.kind === "duel" ? <Swords /> : p.kind === "bet" ? <Dices /> : <Newspaper />;
+  const text = p.kind === "slots"
+    ? <><b>{String(pl.club)}</b> tirou <b className={pl.rarity === "legendary" ? "text-gold" : pl.rarity === "disaster" ? "text-down" : "text-accent"}>{String(pl.label)}</b> na roleta. {String(pl.detail ?? "")}</>
+    : p.kind === "duel"
+    ? <>Duelo na roleta: <b>{String(pl.a)}</b> {String(pl.a_score)} – {String(pl.b_score)} <b>{String(pl.b)}</b>{pl.winner ? <> · <b>{String(pl.winner)}</b> leva {eur(Number(pl.stake_cents))}</> : " · empate"}.</>
+    : p.kind === "bet"
+    ? <><b>{String(pl.club)}</b> acertou {String(pl.match)} a <b>{Number(pl.odds).toFixed(2)}</b> e ganhou <b>{eur(Number(pl.payout_cents))}</b>.</>
+    : p.kind === "transfer"
     ? <>{String(pl.to)} contrata <Link href={`/g/${gameId}/players/${pl.player_id}`} className="font-bold hover:text-accent">{String(pl.player)}</Link> ao {String(pl.from)}{pl.swap ? <> em troca de <b>{String(pl.swap)}</b>{Number(pl.amount_cents) > 0 ? ` + ${eur(Number(pl.amount_cents))}` : ""}</> : <> por <b>{eur(Number(pl.amount_cents))}</b></>}{pl.between_humans ? " — negócio entre treinadores" : ""}.</>
     : p.kind === "achievement" ? <><b>{String(pl.manager)}</b> ({String(pl.club)}) desbloqueou <b className={TIER[(pl.tier as Tier) ?? "bronze"]}>{String(pl.title)}</b>.</>
     : <>O Apito, J{String(pl.round)}: <Link href={pl.fixture_id ? `/g/${gameId}/matches/${pl.fixture_id}` : `/g/${gameId}/news`} className="font-display font-bold uppercase hover:text-accent">{String(pl.headline)}</Link></>;

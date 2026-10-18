@@ -14,6 +14,7 @@ export function hubs(isOwner: boolean): Hub[] {
     { id: "hoje", label: "Hoje", icon: House, dock: true, tabs: [
       { key: "", label: "Resumo", keywords: "início overview home" },
       { key: "/week", label: "Semana", keywords: "gabinete imprensa treino adversário decisões" },
+      { key: "/slots", label: "Roleta", keywords: "slot spin girar jackpot sorte duelo emblemas cartas" },
     ] },
     { id: "equipa", label: "Equipa", icon: Shirt, dock: true, tabs: [
       { key: "/squad", label: "Plantel", keywords: "escalação onze jogadores" },
@@ -21,6 +22,7 @@ export function hubs(isOwner: boolean): Hub[] {
     ] },
     { id: "jogo", label: "Jogo", icon: CalendarDays, dock: true, tabs: [
       { key: "/fixtures", label: "Jogos", keywords: "calendário resultados centro de jogo" },
+      { key: "/bets", label: "Apostas", keywords: "odds apostar casa de apostas 1x2" },
     ] },
     { id: "mercado", label: "Mercado", icon: ArrowLeftRight, dock: true, tabs: [
       { key: "/market", label: "Mercado", keywords: "transferências propostas livres contratar" },

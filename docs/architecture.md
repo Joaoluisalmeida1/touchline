@@ -85,6 +85,11 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 - Motor puro `src/engine/market/market.ts` (preços, descida, escolha de novos jogadores, compras da IA). Serviço `src/server/services/market.ts`: `marketTick` (idempotente por época/jornada; chamado em `processNextMatchday` antes e depois da jornada, no fim da época e ao abrir o Mercado) e `buyListing` → `buy_listing_tx`. A IA compra através de `_market_ai_buy`, que reutiliza `_execute_transfer` (livro-razão, plantel mínimo/máximo, mural, notificações).
 - `transfer_listings` ganhou origem (`manager`/`ai`/`external`), preços inicial/mínimo, jornadas por vender, comprador e preço de venda (migração 0018).
 
+## Roleta e apostas
+
+- Motores puros `src/engine/slots/slots.ts` (tabela de prémios, rolos, duelos) e `src/engine/betting/odds.ts` (odds 1X2). Serviço `src/server/services/fun.ts`: `spin`, `acceptDuel`, `placeBet` (transação no serviço com a linha do clube bloqueada; erros via `_fail`), e depois de cada jornada `settleBets` + `applyCards` (em `processNextMatchday`). Comandos SQL sem acaso: `equip_skin`, `activate_card`, `create_duel`, `close_duel`, `set_fun_settings` (migração 0019).
+- Livro-razão: tipos `slots` e `betting`; o mural ganhou `slots`, `duel`, `bet`.
+
 ## Interface v2 (fundação)
 
 - `src/app/g/[gameId]/layout.tsx` carrega o jogo, as cores do clube, `getTodayItems` (decisões pendentes, RLS) e o plantel leve, e entrega tudo ao `GameShell` (cliente): barra lateral, barra de contexto com sub-separadores do hub, prazo, ⌘K e gaveta "Por decidir"; doca de 5 hubs no telemóvel.

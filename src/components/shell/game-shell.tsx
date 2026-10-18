@@ -6,7 +6,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import {
-  Bell, CalendarClock, ChevronRight, Contact, Gavel, Handshake, Inbox, LayoutGrid, LogOut, Megaphone, Search, Sprout, X,
+  Bell, CalendarClock, ChevronRight, Contact, Gavel, Handshake, Inbox, LayoutGrid, LogOut, Megaphone, Search, Sprout, Swords, X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,7 +25,7 @@ export interface ShellGame {
   id: string; name: string; league: string; status: string; season: number; round: number; totalRounds: number;
   deadline: string | null; synthetic: boolean; isOwner: boolean;
 }
-export interface ShellClub { id: string; name: string; short: string; primary: string; secondary: string }
+export interface ShellClub { id: string; name: string; short: string; primary: string; secondary: string; skin?: string | null }
 
 export function GameShell({ game, club, today, players, children }: {
   game: ShellGame; club: ShellClub | null; today: TodayItem[]; players: { id: string; name: string; ovr: number; position_group: string }[];
@@ -113,7 +113,7 @@ function ContextBar({ game, club, hub, tabHref, base, todayCount, onToday, onPal
       <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 pt-3 sm:px-6 lg:px-8">
         {club ? (
           <Link href={`${base}/club`} prefetch={false} aria-label={`${club.name} — clube`} className="shrink-0">
-            <ClubBadge seed={club.id} name={club.name} short={club.short} primary={club.primary} secondary={club.secondary} size={40} />
+            <ClubBadge seed={club.id} name={club.name} short={club.short} primary={club.primary} secondary={club.secondary} skin={club.skin} size={40} />
           </Link>
         ) : (
           <Link href="/dashboard" prefetch={false} aria-label="As minhas ligas" className="shrink-0 text-ink md:hidden"><LogoMark size={30} /></Link>
@@ -208,10 +208,10 @@ function MobileDock({ hubs: all, active, base }: { hubs: Hub[]; active: string; 
 /* ------------------------------------------------------------------ today drawer */
 
 const KIND_ICON: Record<TodayKind, ReactNode> = {
-  inbox: <Inbox />, press: <Megaphone />, sponsor: <Handshake />, contract: <Contact />, offer_in: <Gavel />, counter: <Gavel />, academy: <Sprout />,
+  inbox: <Inbox />, press: <Megaphone />, sponsor: <Handshake />, contract: <Contact />, offer_in: <Gavel />, counter: <Gavel />, academy: <Sprout />, duel: <Swords />,
 };
 const KIND_LABEL: Record<TodayKind, string> = {
-  inbox: "Gabinete", press: "Imprensa", sponsor: "Patrocínio", contract: "Contrato", offer_in: "Proposta recebida", counter: "Contraproposta", academy: "Formação",
+  inbox: "Gabinete", press: "Imprensa", sponsor: "Patrocínio", contract: "Contrato", offer_in: "Proposta recebida", counter: "Contraproposta", academy: "Formação", duel: "Duelo",
 };
 
 function TodayDrawer({ open, onClose, items, round }: { open: boolean; onClose: () => void; items: TodayItem[]; round: number }) {
