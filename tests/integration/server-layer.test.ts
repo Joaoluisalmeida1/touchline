@@ -9,6 +9,7 @@ import { NextRequest } from "next/server";
 import { buildSnapshot } from "../../src/integrations/catalog/snapshot";
 import { seedSyntheticLeague, SYNTHETIC_ANCHORS } from "../../src/integrations/catalog/synthetic";
 import { createGame } from "../../src/server/services/create-game";
+import { processDueGames } from "../../src/server/services/matchday";
 import * as Q from "../../src/server/queries";
 import * as A from "../../src/server/actions";
 import { GET as health } from "../../src/app/api/health/route";
@@ -190,6 +191,19 @@ describe("asUser (role impersonation)", () => {
     expect(r).toEqual({ current_user: "authenticated", uid: owner });
   });
 
+  it("applies statement and idle-in-transaction timeouts to user transactions only", async () => {
+    const inside = await asUserProd(pool, owner, (c) =>
+      c.query(`select current_setting('statement_timeout') st, current_setting('idle_in_transaction_session_timeout') idle`).then((x) => x.rows[0]));
+    expect(inside).toEqual({ st: "8s", idle: "30s" });
+    const client = await pool.connect(); // transaction-local: pooled connections go back to the server defaults
+    try {
+      expect((await client.query(`show statement_timeout`)).rows[0].statement_timeout).toBe("0");
+    } finally {
+      client.release();
+    }
+    await expect(asUserProd(pool, owner, (c) => c.query(`select pg_sleep(9)`))).rejects.toThrow(/statement timeout/);
+  }, 20_000);
+
   it("rejects anything that is not a UUID (values are inlined into the setup statement)", async () => {
     for (const bad of ["", "not-a-uuid", `${owner}'; drop table games; --`, `${owner}\n`]) {
       await expect(asUserProd(pool, bad, async () => null)).rejects.toThrow(/must be a UUID/);
@@ -221,5 +235,12 @@ describe("API routes", () => {
     body = await (await cron(cronReq(`Bearer ${CRON_SECRET}`))).json();
     expect(body.processed).toBe(1);
     expect(body.results[0]).toMatchObject({ game_id: gameId, result: { status: "processed", round: 2 } });
+  });
+
+  it("processDueGames skips leagues already handled in the same cron call", async () => {
+    await pool.query(`update games set next_deadline_at = now() - interval '1 minute' where id = $1`, [gameId]);
+    expect(await processDueGames(pool, { excludeIds: [gameId] })).toEqual([]);
+    const [r] = await processDueGames(pool, {});
+    expect(r).toMatchObject({ game_id: gameId, result: { status: "processed", round: 3 } });
   });
 });

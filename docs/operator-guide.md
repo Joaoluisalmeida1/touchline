@@ -97,6 +97,8 @@ Escreve em `source_players`, `dataset_snapshot_players` e nas ligas já criadas 
 
 ## Backups e migração
 
+Backups automáticos (diários, cifrados, com teste de restauro) e o procedimento de restauro: [`docs/runbook.md`](runbook.md). Os comandos abaixo são para cópias manuais pontuais.
+
 ```bash
 pg_dump "$SUPABASE_DB_URL" -Fc -f backup-$(date +%F).dump          # backup completo
 pg_restore --clean --no-owner -d "$TARGET_DB_URL" backup-AAAA-MM-DD.dump
