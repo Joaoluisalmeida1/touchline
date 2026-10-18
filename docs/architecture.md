@@ -96,7 +96,7 @@ Falha a meio: a lease é libertada, `processing_round` mantém-se; a próxima ch
 
 ## Observabilidade
 
-Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`, `page.failed`, `request.failed` via `src/instrumentation.ts`, `cron.run`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD. Rotinas (cron a cada 15 min, backups, alertas) e incidentes: [`runbook.md`](runbook.md). Erros de página mostram `error.tsx` (liga e app) com a referência (`digest`) que aparece nos logs.
+Logs JSON estruturados (`matchday.begin`, `fixture.finalized`, `matchday.complete`, `matchday.failed`, `action.failed`, `page.failed`, `request.failed` via `src/instrumentation.ts`, `cron.run`) com `game_id`, `fixture_id`, `request_id`, `simulation_version`, duração. `audit_log` regista mutações sensíveis. `/api/health` verifica a BD. Rotinas (cron diário, uptime a cada 15 min, backups, alertas) e incidentes: [`runbook.md`](runbook.md). Erros de página mostram `error.tsx` (liga e app) com a referência (`digest`) que aparece nos logs.
 
 ## Desempenho do pedido
 
